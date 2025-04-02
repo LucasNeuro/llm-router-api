@@ -1,72 +1,86 @@
 import os
-from typing import Dict, Any, Optional
-from openai import AsyncOpenAI
+from openai import OpenAI
+from loguru import logger
+from typing import Optional, Dict, Any
 import httpx
+from dotenv import load_dotenv
 
-# Initialize OpenAI client with API key
-GPT_API_KEY = os.getenv("GPT_API_KEY")
+# Carrega variáveis de ambiente
+load_dotenv()
 
-# Configuração do cliente HTTP
-http_client = httpx.AsyncClient(
-    timeout=httpx.Timeout(connect=5.0, read=300.0, write=300.0, pool=300.0),
-    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
-)
-
-# Initialize OpenAI client
-client = AsyncOpenAI(
-    api_key=GPT_API_KEY,
-    http_client=http_client,
-    timeout=300.0
-) if GPT_API_KEY else None
-
-async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Call GPT model with the given prompt using the new OpenAI API syntax
-    """
+# Configuração do cliente OpenAI
+def get_openai_client() -> OpenAI:
+    """Cria e configura o cliente OpenAI com retry e timeout"""
     try:
-        if not GPT_API_KEY:
-            return {
-                "text": "GPT_API_KEY não configurada",
-                "model": "gpt",
-                "success": False
-            }
-            
-        if not client:
-            return {
-                "text": "Cliente OpenAI não inicializado",
-                "model": "gpt",
-                "success": False
-            }
-            
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+        # Configuração do proxy se existir
+        proxy = os.getenv("OPENAI_PROXY")
         
-        response = await client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=2000
+        # Cria o cliente com configurações básicas
+        client = OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            max_retries=3
         )
         
-        text = response.choices[0].message.content
-        
-        return {
-            "text": text,
-            "model": "gpt",
-            "success": True,
-            "tokens": {
-                "prompt": response.usage.prompt_tokens,
-                "completion": response.usage.completion_tokens,
-                "total": response.usage.total_tokens
-            }
-        }
-        
+        # Configura o proxy se existir
+        if proxy:
+            client.http_client.set_proxy(proxy)
+            
+        return client
     except Exception as e:
-        error_msg = f"Error calling GPT: {str(e)}"
-        return {
-            "text": error_msg,
-            "model": "gpt",
-            "success": False
+        logger.error(f"Erro ao criar cliente OpenAI: {str(e)}")
+        raise
+
+# Inicializa o cliente
+client = get_openai_client()
+
+def generate_response(
+    prompt: str,
+    model: str = "gpt-4-turbo-preview",
+    temperature: float = 0.7,
+    max_tokens: Optional[int] = None,
+    stream: bool = False,
+    **kwargs: Dict[str, Any]
+) -> str:
+    """
+    Gera uma resposta usando o modelo GPT especificado.
+    
+    Args:
+        prompt: O texto do prompt
+        model: O modelo a ser usado (default: gpt-4-turbo-preview)
+        temperature: Temperatura para controle de criatividade (0.0 a 1.0)
+        max_tokens: Número máximo de tokens na resposta
+        stream: Se True, retorna a resposta em streaming
+        **kwargs: Argumentos adicionais para a API
+        
+    Returns:
+        str: A resposta gerada pelo modelo
+    """
+    try:
+        # Log da chamada
+        logger.info(f"Chamando GPT com modelo {model}")
+        
+        # Prepara os parâmetros
+        params = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            **kwargs
         }
+        
+        # Adiciona max_tokens se especificado
+        if max_tokens:
+            params["max_tokens"] = max_tokens
+            
+        # Faz a chamada à API
+        response = client.chat.completions.create(**params)
+        
+        # Processa a resposta
+        if stream:
+            return response
+        else:
+            return response.choices[0].message.content
+            
+    except Exception as e:
+        logger.error(f"Erro ao gerar resposta com GPT: {str(e)}")
+        raise
