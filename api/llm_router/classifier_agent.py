@@ -289,8 +289,7 @@ def calculate_indicator_weights(text: str, indicators: Dict[str, bool]) -> Dict[
     return weights
 
 def analyze_indicators(prompt: str) -> Dict[str, Any]:
-    """Analisa o prompt e retorna indicadores de complexidade."""
-    # Inicializa contadores
+    """Analisa o prompt e retorna indicadores de complexidade com análise refinada."""
     scores = {
         "complex": 0.0,
         "technical": 0.0,
@@ -298,109 +297,191 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
         "simple": 0.0
     }
     
-    # Converte prompt para minúsculas para comparação
     prompt_lower = prompt.lower()
+    words = prompt_lower.split()
     
-    # Análise de complexidade baseada em palavras-chave
-    for keyword in COMPLEXITY_KEYWORDS["high"]:
-        if keyword.lower() in prompt_lower:
-            scores["complex"] += 1.0
-            scores["technical"] += 0.5
+    # 1. Análise de Complexidade
+    # Palavras que indicam alta complexidade
+    high_complexity_terms = [
+        "análise detalhada", "profunda", "complexo", "avançado",
+        "implementação", "arquitetura", "sistema", "framework",
+        "metodologia", "teoria", "conceito", "paradigma",
+        "otimização", "algoritmo", "estrutura", "design"
+    ]
+    
+    # Termos técnicos específicos
+    technical_terms = [
+        "código", "programação", "desenvolvimento", "api",
+        "banco de dados", "servidor", "rede", "protocolo",
+        "segurança", "criptografia", "autenticação", "deploy",
+        "pipeline", "infraestrutura", "cloud", "container"
+    ]
+    
+    # Termos de análise
+    analytical_terms = [
+        "compare", "analise", "avalie", "discuta",
+        "explique", "descreva", "examine", "investigue",
+        "considere", "explore", "sintetize", "relacione"
+    ]
+    
+    # Termos simples
+    simple_terms = [
+        "como", "qual", "onde", "quando", "liste",
+        "diga", "mostre", "exemplo", "básico", "simples",
+        "fácil", "rápido", "direto", "passo a passo"
+    ]
+
+    # 2. Análise Estrutural
+    sentence_length = len(words)
+    has_multiple_questions = prompt_lower.count("?") > 1
+    has_technical_requirements = any(term in prompt_lower for term in technical_terms)
+    has_complex_structure = ";" in prompt or "," in prompt
+    
+    # 3. Pontuação baseada em análise detalhada
+    
+    # Complexidade
+    for term in high_complexity_terms:
+        if term in prompt_lower:
+            scores["complex"] += 1.5
             
-    for keyword in COMPLEXITY_KEYWORDS["medium"]:
-        if keyword.lower() in prompt_lower:
-            scores["analytical"] += 0.5
+    if sentence_length > 30:
+        scores["complex"] += 1.0
+    if has_multiple_questions:
+        scores["complex"] += 0.5
+    if has_complex_structure:
+        scores["complex"] += 0.5
+        
+    # Técnico
+    for term in technical_terms:
+        if term in prompt_lower:
+            scores["technical"] += 1.0
             
-    for keyword in COMPLEXITY_KEYWORDS["low"]:
-        if keyword.lower() in prompt_lower:
+    if has_technical_requirements:
+        scores["technical"] += 1.0
+        
+    # Analítico
+    for term in analytical_terms:
+        if term in prompt_lower:
+            scores["analytical"] += 1.0
+            
+    # Simplicidade
+    for term in simple_terms:
+        if term in prompt_lower:
             scores["simple"] += 1.0
             
-    # Análise de tipo de tarefa
-    for keyword in TASK_KEYWORDS["technical"]:
-        if keyword.lower() in prompt_lower:
-            scores["technical"] += 1.0
-            scores["complex"] += 0.5
-            
-    for keyword in TASK_KEYWORDS["analysis"]:
-        if keyword.lower() in prompt_lower:
-            scores["analytical"] += 1.0
-            scores["complex"] += 0.5
-            
-    for keyword in TASK_KEYWORDS["complex"]:
-        if keyword.lower() in prompt_lower:
-            scores["complex"] += 1.0
-            scores["technical"] += 0.5
-            
-    # Normaliza os scores
+    if sentence_length < 15:
+        scores["simple"] += 1.0
+    if not has_complex_structure:
+        scores["simple"] += 0.5
+        
+    # 4. Normalização dos scores
     total = sum(scores.values()) or 1.0
     normalized_scores = {k: v/total * 5.0 for k, v in scores.items()}
     
+    # 5. Análise adicional para debug
+    analysis = {
+        "sentence_length": sentence_length,
+        "has_multiple_questions": has_multiple_questions,
+        "has_technical_requirements": has_technical_requirements,
+        "has_complex_structure": has_complex_structure
+    }
+    
     return {
         "scores": normalized_scores,
-        "raw_scores": scores
+        "raw_scores": scores,
+        "analysis": analysis
     }
 
 def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
-    """Calcula a pontuação para cada modelo baseado nos indicadores."""
+    """Calcula a pontuação para cada modelo com nova hierarquia."""
     scores = indicators["scores"]
+    analysis = indicators["analysis"]
     
-    # Pesos para cada aspecto por modelo
+    # Nova hierarquia de modelos (sem GPT)
     weights = {
         "deepseek": {
-            "complex": 0.7,      # Aumentado para priorizar alta complexidade
+            "complex": 0.9,      # Prioridade máxima para complexidade alta
             "technical": 0.1,
             "analytical": 0.1,
-            "simple": -0.7       # Penalidade maior para tarefas simples
+            "simple": -0.9      # Forte penalidade para simplicidade
         },
         "gemini": {
-            "complex": 0.2,      # Médio para complexidade
-            "technical": 0.2,
-            "analytical": 0.2,    # Maior peso em análise
-            "simple": 0.7        # Aceita tarefas simples também
-        },
-        "gpt": {
-            "complex": 0.2,
-            "technical": 0.7,    # Maior peso para técnico
-            "analytical": 0.2,
-            "simple": -0.10
+            "complex": 0.4,     # Foco em complexidade média
+            "technical": 0.6,   # Foco em questões técnicas
+            "analytical": 0.4,
+            "simple": 0.2
         },
         "mistral": {
-            "complex": -0.3,     # Forte penalidade para complexidade
-            "technical": -0.2,    # Penalidade para técnico
+            "complex": -0.8,    # Forte penalidade para complexidade
+            "technical": -0.4,  # Penalidade para técnico
             "analytical": 0.1,
-            "simple": 0.10        # Muito alto para tarefas simples
+            "simple": 0.9       # Prioridade máxima para simplicidade
         }
     }
     
+    # Cálculo de scores com ajustes baseados na análise
     model_scores = {}
     for model, model_weights in weights.items():
-        score = sum(scores[aspect] * weight for aspect, weight in model_weights.items())
-        model_scores[model] = max(0.0, min(1.0, score / 5.0))  # Normaliza entre 0 e 1
+        base_score = sum(scores[aspect] * weight for aspect, weight in model_weights.items())
         
+        # Ajustes específicos por modelo
+        if model == "deepseek":
+            if analysis["sentence_length"] > 30:
+                base_score *= 1.3
+            if analysis["has_complex_structure"]:
+                base_score *= 1.2
+                
+        elif model == "gemini":
+            if 15 <= analysis["sentence_length"] <= 30:
+                base_score *= 1.2
+            if analysis["has_technical_requirements"]:
+                base_score *= 1.1
+                
+        elif model == "mistral":
+            if analysis["sentence_length"] < 15:
+                base_score *= 1.3
+            if not analysis["has_complex_structure"]:
+                base_score *= 1.2
+                
+        model_scores[model] = max(0.0, min(1.0, base_score / 5.0))
+    
     return model_scores
 
 def classify_prompt(prompt: str) -> Dict[str, Any]:
-    """Classifica o prompt e retorna o modelo mais adequado com metadados."""
-    # Analisa os indicadores do prompt
+    """Classifica o prompt com nova hierarquia de modelos."""
+    # Analisa os indicadores
     indicators = analyze_indicators(prompt)
     
-    # Calcula as pontuações dos modelos
+    # Calcula pontuações dos modelos
     model_scores = calculate_model_scores(indicators)
     
-    # Encontra o modelo com maior pontuação
-    recommended_model = max(model_scores.items(), key=lambda x: x[1])[0]
+    # Thresholds ajustados para nova hierarquia
+    thresholds = {
+        "complex": 1.5,    # Aumentado para complexidade alta
+        "technical": 1.3,  # Ajustado para questões técnicas
+        "analytical": 1.2,
+        "simple": 0.8
+    }
     
-    # Calcula a confiança baseada na diferença para o segundo colocado
+    # Determina o nível de complexidade
+    complexity_level = "high" if indicators["scores"]["complex"] > thresholds["complex"] else \
+                      "medium" if indicators["scores"]["technical"] > thresholds["technical"] else \
+                      "low" if indicators["scores"]["simple"] > thresholds["simple"] else "medium"
+    
+    # Escolhe o modelo baseado na complexidade
+    if complexity_level == "high" and model_scores["deepseek"] > 0.6:
+        recommended_model = "deepseek"
+    elif complexity_level == "medium" and model_scores["gemini"] > 0.6:
+        recommended_model = "gemini"
+    elif complexity_level == "low" and model_scores["mistral"] > 0.6:
+        recommended_model = "mistral"
+    else:
+        # Se nenhum modelo tem confiança suficiente, escolhe o com maior score
+        recommended_model = max(model_scores.items(), key=lambda x: x[1])[0]
+    
+    # Calcula confiança
     scores_sorted = sorted(model_scores.values(), reverse=True)
     confidence = scores_sorted[0] - scores_sorted[1] if len(scores_sorted) > 1 else 1.0
-    
-    # Define os thresholds para os indicadores
-    thresholds = {
-        "complex": 1.2,    # Reduzido para ser mais sensível
-        "technical": 1.2,  # Reduzido para ser mais sensível
-        "analytical": 1.2, # Reduzido para ser mais sensível
-        "simple": 0.7      # Reduzido para ser mais sensível
-    }
     
     return {
         "model": recommended_model,
@@ -412,5 +493,7 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
             "analytical": indicators["scores"]["analytical"] > thresholds["analytical"],
             "simple": indicators["scores"]["simple"] > thresholds["simple"]
         },
-        "raw_scores": indicators["scores"]  # Para debug
+        "complexity_level": complexity_level,
+        "raw_scores": indicators["scores"],
+        "analysis": indicators["analysis"]
     }
