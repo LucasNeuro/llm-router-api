@@ -27,7 +27,7 @@ async def test_gpt():
             model="gpt-4-turbo-preview",
             messages=[
                 {"role": "system", "content": "Você é um assistente prestativo."},
-                {"role": "user", "content": "Olá, pode me dizer que horas são em Roma?"}
+                {"role": "user", "content": "Olá, quem  e o  primeiro  presidente  do  dos  estados  unidos ?"}
             ],
             temperature=0.7,
             max_tokens=100

@@ -1,10 +1,23 @@
 import os
 from typing import Dict, Any, Optional
 from openai import AsyncOpenAI
+import httpx
 
 # Initialize OpenAI client with API key
 GPT_API_KEY = os.getenv("GPT_API_KEY")
-client = AsyncOpenAI(api_key=GPT_API_KEY) if GPT_API_KEY else None
+
+# Configuração do cliente HTTP
+http_client = httpx.AsyncClient(
+    timeout=httpx.Timeout(connect=5.0, read=300.0, write=300.0, pool=300.0),
+    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+)
+
+# Initialize OpenAI client
+client = AsyncOpenAI(
+    api_key=GPT_API_KEY,
+    http_client=http_client,
+    timeout=300.0
+) if GPT_API_KEY else None
 
 async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
     """
