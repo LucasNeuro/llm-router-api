@@ -10,7 +10,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
-from api.routers import chat, whatsapp, health
 import logging
 from datetime import datetime
 
@@ -18,14 +17,14 @@ from datetime import datetime
 load_dotenv()
 
 # Configuração de logging
-log_path = Path("api/logs")
+log_path = Path("logs")
 log_path.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(f"api/logs/api_{datetime.now().strftime('%Y%m%d')}.log"),
+        logging.FileHandler(f"logs/api_{datetime.now().strftime('%Y%m%d')}.log"),
         logging.StreamHandler()
     ]
 )
@@ -49,6 +48,8 @@ app.add_middleware(
 )
 
 # Inclui os routers
+from api.routers import chat, whatsapp, health
+
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["whatsapp"])
 app.include_router(health.router, tags=["health"])
@@ -59,4 +60,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
