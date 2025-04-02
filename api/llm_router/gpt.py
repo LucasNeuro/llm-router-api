@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, Optional
 from openai import AsyncOpenAI
-from utils.logger import logger, log_llm_call, log_llm_response
+from api.utils.logger import logger, log_llm_call, log_llm_response
 
 # Initialize OpenAI client with API key
 client = AsyncOpenAI(api_key=os.getenv("GPT_API_KEY"))

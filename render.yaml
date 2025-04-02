@@ -2,7 +2,9 @@ services:
   - type: web
     name: llm-router-api
     env: python
-    buildCommand: pip install -r api/requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      export PYTHONPATH=$PYTHONPATH:/opt/render/project/src
     startCommand: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
@@ -16,4 +18,4 @@ services:
       - key: MEGAAPI_TOKEN
         sync: false
       - key: MEGAAPI_INSTANCE_KEY
-        sync: false 
+        sync: false

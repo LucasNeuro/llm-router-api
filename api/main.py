@@ -1,11 +1,17 @@
+import os
+import sys
+from pathlib import Path
+
+# Adiciona o diretório raiz ao PYTHONPATH
+root_dir = Path(__file__).parent.parent
+sys.path.append(str(root_dir))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional
-import os
 from dotenv import load_dotenv
 from api.routers import chat, whatsapp
 import logging
-from pathlib import Path
 from datetime import datetime
 
 # Carrega variáveis de ambiente

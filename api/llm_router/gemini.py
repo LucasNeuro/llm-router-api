@@ -1,7 +1,7 @@
-import os
 import google.generativeai as genai
+import os
 from typing import Dict, Any, Optional
-from utils.logger import logger
+from api.utils.logger import logger
 
 # Configurações do Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
