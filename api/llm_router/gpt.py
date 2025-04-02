@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Carrega variáveis de ambiente
 load_dotenv()
 
-# Inicializa o cliente OpenAI diretamente
+# Inicializa o cliente OpenAI com a API key explícita
 client = OpenAI(
     api_key=os.getenv("GPT_API_KEY")
 )

@@ -1,6 +1,10 @@
 import os
 from typing import Dict, Any, Optional
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
+
+# Carrega variáveis de ambiente
+load_dotenv()
 
 # Initialize OpenAI client with API key
 client = AsyncOpenAI(
