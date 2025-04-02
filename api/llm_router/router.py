@@ -1,9 +1,10 @@
 from typing import Dict, Any, Optional
-import json
 from .deepseek import call_deepseek
 from .gemini import call_gemini
 from .mistral import call_mistral
-from ..utils.logger import logger
+from .gpt import call_gpt
+from .classifier_agent import classify_prompt
+from utils.logger import logger
 
 # System prompts padrão para cada modelo
 DEFAULT_SYSTEM_PROMPTS = {

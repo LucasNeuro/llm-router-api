@@ -1,12 +1,9 @@
 import os
 from typing import Dict, Any, Optional
-from ..utils.logger import logger
+from utils.logger import logger
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 import asyncio
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Initialize Mistral client
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")

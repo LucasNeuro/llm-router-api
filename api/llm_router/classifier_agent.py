@@ -1,10 +1,9 @@
 import google.generativeai as genai
 import os
 from typing import Dict, Any, List
-from ..utils.logger import logger
+from utils.logger import logger
 import re
 import logging
-from .gpt import call_gpt
 
 logger = logging.getLogger(__name__)
 
