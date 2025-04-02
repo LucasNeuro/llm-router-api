@@ -19,13 +19,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 try:
     supabase: Client = create_client(
         supabase_url=SUPABASE_URL,
-        supabase_key=SUPABASE_KEY,
-        options={
-            "auth": {
-                "autoRefreshToken": True,
-                "persistSession": False
-            }
-        }
+        supabase_key=SUPABASE_KEY
     )
 except Exception as e:
     print(f"Erro ao inicializar Supabase: {str(e)}")
