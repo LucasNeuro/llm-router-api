@@ -2,20 +2,26 @@ services:
   - type: web
     name: llm-router-api
     env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      export PYTHONPATH=$PYTHONPATH:/opt/render/project/src
+    buildCommand: pip install -r requirements.txt
     startCommand: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: OPENAI_API_KEY
+      - key: PYTHONPATH
+        value: /api
+      - key: GPT_API_KEY
         sync: false
-      - key: GOOGLE_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
       - key: MISTRAL_API_KEY
         sync: false
-      - key: MEGAAPI_TOKEN
+      - key: DEEPSEEK_API_KEY
         sync: false
-      - key: MEGAAPI_INSTANCE_KEY
+      - key: SUPABASE_URL
         sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: MEGA_API_INSTANCE_ID
+        sync: false
+      - key: MEGA_API_KEY
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true

@@ -1,0 +1,18 @@
+2025-04-02 13:09:55 | INFO     | api.routers.chat:chat_endpoint:41 - Requisição recebida - ID: 3ee62e15-8828-4d5b-80ae-cc5e50021101
+2025-04-02 13:09:55 | INFO     | api.routers.chat:chat_endpoint:42 - Prompt: Implementação detalhada de um sistema distribuído de microsserviços usando Kubernetes. Explique a arquitetura completa, incluindo service mesh, load balancing, circuit breakers, e forneça exemplos de código para implementação de resiliência e observabilidade.
+2025-04-02 13:09:55 | INFO     | api.routers.chat:chat_endpoint:43 - Modelo especificado: None
+2025-04-02 13:09:55 | INFO     | api.llm_router.router:route_prompt:19 - Modelo escolhido: deepseek
+2025-04-02 13:09:55 | INFO     | api.llm_router.router:route_prompt:20 - Pontuações: {'gpt': 0.1, 'deepseek': 0.7, 'mistral': 0.1, 'gemini': 0.1}
+2025-04-02 13:09:55 | INFO     | api.llm_router.router:route_prompt:21 - Indicadores: {'complex': True, 'technical': True, 'analytical': False, 'simple': True}
+2025-04-02 13:12:26 | INFO     | api.routers.chat:chat_endpoint:41 - Requisição recebida - ID: 53083382-ad37-4494-8b84-3eeb87565714
+2025-04-02 13:12:26 | INFO     | api.routers.chat:chat_endpoint:42 - Prompt: Como implementar autenticação OAuth2 em uma API REST usando Node.js e Express? Mostre exemplos práticos de código e configuração.
+2025-04-02 13:12:26 | INFO     | api.routers.chat:chat_endpoint:43 - Modelo especificado: None
+2025-04-02 13:12:26 | INFO     | api.llm_router.router:route_prompt:19 - Modelo escolhido: gemini
+2025-04-02 13:12:26 | INFO     | api.llm_router.router:route_prompt:20 - Pontuações: {'gpt': 0.3, 'deepseek': 0.1, 'mistral': 0.2, 'gemini': 0.4}
+2025-04-02 13:12:26 | INFO     | api.llm_router.router:route_prompt:21 - Indicadores: {'complex': False, 'technical': False, 'analytical': False, 'simple': True}
+2025-04-02 13:13:10 | INFO     | api.routers.chat:chat_endpoint:41 - Requisição recebida - ID: 8df08cd0-be1d-449a-b491-770f5f66cd58
+2025-04-02 13:13:10 | INFO     | api.routers.chat:chat_endpoint:42 - Prompt: Compare e analise criticamente as diferenças entre MongoDB e PostgreSQL. Avalie os pros e contras considerando: performance, escalabilidade e casos de uso.
+2025-04-02 13:13:10 | INFO     | api.routers.chat:chat_endpoint:43 - Modelo especificado: None
+2025-04-02 13:13:10 | INFO     | api.llm_router.router:route_prompt:19 - Modelo escolhido: mistral
+2025-04-02 13:13:10 | INFO     | api.llm_router.router:route_prompt:20 - Pontuações: {'gpt': 0.1, 'deepseek': 0.1, 'mistral': 0.6, 'gemini': 0.2}
+2025-04-02 13:13:10 | INFO     | api.llm_router.router:route_prompt:21 - Indicadores: {'complex': False, 'technical': False, 'analytical': True, 'simple': False}

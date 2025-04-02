@@ -1,0 +1,13 @@
+2025-04-02 13:05:39 | INFO     | api.routers.chat:chat_endpoint:41 - Requisição recebida - ID: 341949d5-192a-4178-9ddd-5fa05baed73c
+2025-04-02 13:05:39 | INFO     | api.routers.chat:chat_endpoint:42 - Prompt: Implementação detalhada de um sistema distribuído de microsserviços usando Kubernetes. Explique a arquitetura completa, incluindo service mesh, load balancing, circuit breakers, e forneça exemplos de código para implementação de resiliência e observabilidade.
+2025-04-02 13:05:39 | INFO     | api.routers.chat:chat_endpoint:43 - Modelo especificado: None
+2025-04-02 13:05:39 | INFO     | api.llm_router.router:route_prompt:29 - Modelo escolhido: deepseek
+2025-04-02 13:05:39 | INFO     | api.llm_router.router:route_prompt:30 - Pontuações: {'gpt': 0.1, 'deepseek': 0.7, 'mistral': 0.1, 'gemini': 0.1}
+2025-04-02 13:05:39 | INFO     | api.llm_router.router:route_prompt:31 - Indicadores: {'scores': {'complex': 5.0, 'technical': 2.5, 'analytical': 0, 'simple': 2.0}, 'word_count': 32, 'is_complex': True, 'is_technical': False, 'is_analytical': False, 'is_simple': False}
+2025-04-02 13:07:06 | ERROR    | api.routers.chat:chat_endpoint:81 - Erro no processamento: 2 validation errors for ChatResponse
+indicators.scores
+  Input should be a valid boolean [type=bool_type, input_value={'complex': 5.0, 'technic...ical': 0, 'simple': 2.0}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/bool_type
+indicators.word_count
+  Input should be a valid boolean, unable to interpret input [type=bool_parsing, input_value=32, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.11/v/bool_parsing

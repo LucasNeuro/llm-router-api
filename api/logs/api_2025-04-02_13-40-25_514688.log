@@ -1,0 +1,12 @@
+2025-04-02 13:43:50 | INFO     | api.routers.chat:chat_endpoint:49 - Requisição recebida - ID: 2f7789b4-dffd-499d-9ca4-0668a69aa620
+2025-04-02 13:43:50 | INFO     | api.routers.chat:chat_endpoint:50 - Prompt: Desenvolva uma implementação detalhada de um sistema de blockchain usando Rust, incluindo: consenso distribuído, proof of work, smart contracts e segurança criptográfica. Forneça exemplos de código e análise de complexidade algorítmica.
+2025-04-02 13:43:50 | INFO     | api.routers.chat:chat_endpoint:51 - Modelo especificado: None
+2025-04-02 13:43:50 | INFO     | api.llm_router.router:route_prompt:19 - Modelo escolhido: deepseek
+2025-04-02 13:43:50 | INFO     | api.llm_router.router:route_prompt:20 - Pontuações: {'gpt': 0.1, 'deepseek': 0.7, 'mistral': 0.1, 'gemini': 0.1}
+2025-04-02 13:43:50 | INFO     | api.llm_router.router:route_prompt:21 - Indicadores: {'complex': True, 'technical': False, 'analytical': False, 'simple': True}
+2025-04-02 13:45:44 | INFO     | api.routers.chat:chat_endpoint:49 - Requisição recebida - ID: 58dc68ba-e3f8-4801-a59d-4e678b3c31fb
+2025-04-02 13:45:44 | INFO     | api.routers.chat:chat_endpoint:50 - Prompt: Desenvolva uma implementação detalhada de um sistema de blockchain usando Rust, incluindo: consenso distribuído, proof of work, smart contracts e segurança criptográfica. Forneça exemplos de código e análise de complexidade algorítmica.
+2025-04-02 13:45:44 | INFO     | api.routers.chat:chat_endpoint:51 - Modelo especificado: None
+2025-04-02 13:45:44 | INFO     | api.llm_router.router:route_prompt:19 - Modelo escolhido: deepseek
+2025-04-02 13:45:44 | INFO     | api.llm_router.router:route_prompt:20 - Pontuações: {'gpt': 0.1, 'deepseek': 0.7, 'mistral': 0.1, 'gemini': 0.1}
+2025-04-02 13:45:44 | INFO     | api.llm_router.router:route_prompt:21 - Indicadores: {'complex': True, 'technical': False, 'analytical': False, 'simple': True}

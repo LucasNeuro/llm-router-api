@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
-from api.routers import chat, whatsapp
+from api.routers import chat, whatsapp, health
 import logging
 from datetime import datetime
 
@@ -50,7 +50,8 @@ app.add_middleware(
 
 # Inclui os routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
-app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
+app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["whatsapp"])
+app.include_router(health.router, tags=["health"])
 
 @app.get("/")
 async def root():

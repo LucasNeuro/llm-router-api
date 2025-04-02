@@ -32,7 +32,7 @@ async def test_router():
     for case in test_cases:
         logger.info(f"\nTesting prompt: {case['prompt']}")
         try:
-            response = await router.route(case["prompt"])
+            response = await router.route_prompt(case["prompt"])
             logger.info(f"Response from model: {response.get('model', 'unknown')}")
             logger.info(f"Classification: {response.get('classification', {})}")
             logger.info(f"Response text: {response.get('text', '')[:100]}...")

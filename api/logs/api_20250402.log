@@ -1,0 +1,27 @@
+2025-04-02 13:05:39,900 - api.llm_router.classifier_agent - INFO - Classificação do prompt:
+2025-04-02 13:05:39,900 - api.llm_router.classifier_agent - INFO - Modelo recomendado: deepseek
+2025-04-02 13:05:39,900 - api.llm_router.classifier_agent - INFO - Confiança: 0.7
+2025-04-02 13:05:39,900 - api.llm_router.classifier_agent - INFO - Pontuações: {'gpt': 0.1, 'deepseek': 0.7, 'mistral': 0.1, 'gemini': 0.1}
+2025-04-02 13:05:39,900 - api.llm_router.classifier_agent - INFO - Indicadores: {'scores': {'complex': 5.0, 'technical': 2.5, 'analytical': 0, 'simple': 2.0}, 'word_count': 32, 'is_complex': True, 'is_technical': False, 'is_analytical': False, 'is_simple': False}
+2025-04-02 13:05:40,781 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:09:55,773 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:11:22,917 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 13:12:46,310 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 13:13:46,723 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 13:16:59,887 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:17:01,221 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 13:21:19,694 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:21:48,908 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:29:07,691 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:31:06,192 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:37:20,283 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:43:51,523 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:45:12,501 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 400 Bad Request"
+2025-04-02 13:45:44,804 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:47:06,153 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 400 Bad Request"
+2025-04-02 13:58:28,430 - httpx - INFO - HTTP Request: POST https://api.deepseek.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 13:59:50,929 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 14:04:08,410 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 14:04:09,238 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 14:04:28,555 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-02 14:04:29,171 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
