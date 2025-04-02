@@ -1,10 +1,13 @@
 import os
 from typing import Dict, Any, Optional
-from openai import AsyncOpenAI
-from utils.logger import logger, log_llm_call, log_llm_response
+from openai import OpenAI
+from ..utils.logger import logger, log_llm_call, log_llm_response
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize OpenAI client with API key
-client = AsyncOpenAI(api_key=os.getenv("GPT_API_KEY"))
+client = OpenAI(api_key=os.getenv("GPT_API_KEY"))
 
 async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
     """

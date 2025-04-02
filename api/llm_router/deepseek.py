@@ -1,9 +1,12 @@
 import os
 import httpx
 from typing import Dict, Any, Optional
-from utils.logger import logger
+from ..utils.logger import logger
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configurações do DeepSeek
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
