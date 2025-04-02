@@ -1,6 +1,0 @@
-2025-04-02 12:30:52 | INFO     | api.routers.chat:chat_endpoint:41 - Requisição recebida - ID: b6341472-198b-4e54-a876-6e7ad726bd27
-2025-04-02 12:30:52 | INFO     | api.routers.chat:chat_endpoint:42 - Prompt: Explique detalhadamente a implementação de um sistema distribuído usando o protocolo Raft, incluindo o código em Go para eleição de líder, replicação de logs e tratamento de falhas. Forneça exemplos práticos de implementação.
-2025-04-02 12:30:52 | INFO     | api.routers.chat:chat_endpoint:43 - Modelo especificado: None
-2025-04-02 12:30:52 | INFO     | api.llm_router.router:route_prompt:28 - Modelo escolhido: gpt
-2025-04-02 12:30:52 | INFO     | api.llm_router.router:route_prompt:29 - Pontuações: {'gpt': 1.0, 'deepseek': 0.0, 'mistral': 0.0, 'gemini': 0.0}
-2025-04-02 12:30:52 | INFO     | api.llm_router.router:route_prompt:30 - Indicadores: {'technical': False, 'complex': False, 'creative': False, 'practical': False}

@@ -5,17 +5,12 @@ from rich.logging import RichHandler
 import sys
 import json
 from datetime import datetime
-from pathlib import Path
 
 # Instala o rich traceback handler
 install_rich_traceback(show_locals=True)
 
 # Cria console do Rich
 console = Console()
-
-# Configura diretório de logs
-log_dir = Path(__file__).parent.parent / "logs"
-log_dir.mkdir(exist_ok=True)
 
 # Remove handlers padrão
 logger.remove()
@@ -32,16 +27,6 @@ logger.add(
     ),
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     level="INFO",
-)
-
-# Adiciona handler para arquivo de log
-logger.add(
-    log_dir / "api_{time}.log",
-    rotation="500 MB",
-    retention="10 days",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="DEBUG",
-    encoding="utf-8"
 )
 
 def log_api_request(request_data: dict, route: str):

@@ -1,6 +1,0 @@
-2025-04-02 13:16:27 | INFO     | api.routers.chat:chat_endpoint:41 - Requisição recebida - ID: f9ddfb64-bec0-41a1-9348-1bc39a846589
-2025-04-02 13:16:27 | INFO     | api.routers.chat:chat_endpoint:42 - Prompt: O que é Python? Liste 3 características principais desta linguagem de programação.
-2025-04-02 13:16:27 | INFO     | api.routers.chat:chat_endpoint:43 - Modelo especificado: None
-2025-04-02 13:16:27 | INFO     | api.llm_router.router:route_prompt:19 - Modelo escolhido: gpt
-2025-04-02 13:16:27 | INFO     | api.llm_router.router:route_prompt:20 - Pontuações: {'gpt': 0.6, 'deepseek': 0.1, 'mistral': 0.1, 'gemini': 0.2}
-2025-04-02 13:16:27 | INFO     | api.llm_router.router:route_prompt:21 - Indicadores: {'complex': False, 'technical': False, 'analytical': False, 'simple': True}

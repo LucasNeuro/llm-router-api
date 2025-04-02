@@ -16,17 +16,10 @@ from datetime import datetime
 # Carrega variáveis de ambiente
 load_dotenv()
 
-# Configuração de logging
-log_path = Path("logs")
-log_path.mkdir(parents=True, exist_ok=True)
-
+# Configuração de logging simplificada (apenas console)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(f"logs/api_{datetime.now().strftime('%Y%m%d')}.log"),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
