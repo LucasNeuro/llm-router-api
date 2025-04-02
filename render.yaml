@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: llm-router-api
+    env: python
+    buildCommand: pip install -r api/requirements.txt
+    startCommand: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MEGAAPI_TOKEN
+        sync: false
+      - key: MEGAAPI_INSTANCE_KEY
+        sync: false 

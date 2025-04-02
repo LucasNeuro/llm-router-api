@@ -1,0 +1,15 @@
+# API Dependencies
+fastapi==0.109.2
+uvicorn==0.27.1
+python-dotenv==1.0.1
+neo4j==5.17.0
+google-generativeai==0.3.2
+mistralai==0.0.10
+openai>=1.0.0
+requests==2.31.0
+
+# Logging
+rich==13.7.0
+loguru==0.7.2
+python-json-logger==2.0.7
+tenacity==8.2.3 

@@ -1,0 +1,50 @@
+2025-04-01 20:33:25 | INFO     | api.routers.chat:chat_endpoint:29 - Received chat request: Explique detalhadamente como implementar um sistema de cache distribuído usando Redis, incluindo con...
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:67 - Classifying prompt: Explique detalhadamente como implementar um sistema de cache distribuído usando Redis, incluindo con...
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:76 - Classification results:
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:77 - - Recommended model: deepseek
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:78 - - Task type: technical
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:79 - - Confidence: 0.30
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:80 - - Complexity: medium
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:81 - - Model scores: {'gpt': 5, 'deepseek': 8, 'mistral': 4, 'gemini': 7}
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:82 - - Indicators found:
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:83 -   * Complex: 2
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:84 -   * Technical: 4
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:85 -   * Creative: 0
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:86 -   * Practical: 2
+2025-04-01 20:33:25 | INFO     | api.llm_router.router:route:92 - Attempting to use deepseek with confidence 0.30
+2025-04-01 20:33:25 | INFO     | api.llm_router.deepseek:call_deepseek:56 - Fazendo chamada ao DeepSeek: Explique detalhadamente como implementar um sistem...
+2025-04-01 20:34:25 | INFO     | api.llm_router.router:route:97 - Successfully used deepseek
+2025-04-01 20:40:41 | INFO     | api.routers.chat:chat_endpoint:29 - Received chat request: Quantos dias tem uma semana?...
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:67 - Classifying prompt: Quantos dias tem uma semana?...
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:76 - Classification results:
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:77 - - Recommended model: mistral
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:78 - - Task type: factual
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:79 - - Confidence: 0.33
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:80 - - Complexity: low
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:81 - - Model scores: {'gpt': 1, 'deepseek': 0, 'mistral': 3, 'gemini': 2}
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:82 - - Indicators found:
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:83 -   * Complex: 0
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:84 -   * Technical: 0
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:85 -   * Creative: 0
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:86 -   * Practical: 0
+2025-04-01 20:40:41 | INFO     | api.llm_router.router:route:92 - Attempting to use mistral with confidence 0.33
+2025-04-01 20:40:41 | INFO     | api.llm_router.mistral:call_mistral:25 - Iniciando chamada ao Mistral. Prompt: Quantos dias tem uma semana?...
+2025-04-01 20:40:42 | INFO     | api.llm_router.mistral:call_mistral:45 - Resposta recebida do Mistral com sucesso
+2025-04-01 20:40:42 | INFO     | api.llm_router.router:route:97 - Successfully used mistral
+2025-04-01 20:42:09 | INFO     | api.routers.chat:chat_endpoint:29 - Received chat request: Analise detalhadamente as implicações da adoção de veículos autônomos nas grandes cidades, considera...
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:67 - Classifying prompt: Analise detalhadamente as implicações da adoção de veículos autônomos nas grandes cidades, considera...
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:76 - Classification results:
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:77 - - Recommended model: gpt
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:78 - - Task type: analysis
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:79 - - Confidence: 0.30
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:80 - - Complexity: high
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:81 - - Model scores: {'gpt': 8, 'deepseek': 6, 'mistral': 0, 'gemini': 2}
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:82 - - Indicators found:
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:83 -   * Complex: 4
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:84 -   * Technical: 0
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:85 -   * Creative: 0
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:86 -   * Practical: 0
+2025-04-01 20:42:09 | INFO     | api.llm_router.router:route:92 - Attempting to use gpt with confidence 0.30
+2025-04-01 20:42:09 | INFO     | utils.logger:log_llm_call:62 - [bold purple]LLM Call[/bold purple] to [bold blue]gpt[/bold blue]
+2025-04-01 20:42:44 | INFO     | utils.logger:log_llm_response:69 - [bold purple]LLM Response[/bold purple] from [bold blue]gpt[/bold blue] - Status: [bold green]Success[/bold green]
+2025-04-01 20:42:44 | INFO     | api.llm_router.router:route:97 - Successfully used gpt

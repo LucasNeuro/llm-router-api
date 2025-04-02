@@ -1,0 +1,5 @@
+2025-04-01 18:58:53,332 - api.llm_router.classifier_agent - INFO - Classificando prompt: analise o impacto da computação quântica na cripto...
+2025-04-01 18:58:53,334 - api.llm_router.classifier_agent - INFO - Contadores: code=0, technical=0, creative=0
+2025-04-01 18:58:53,334 - api.llm_router.classifier_agent - INFO - Classificação: task_type=general, model=gemini, confidence=0.50
+2025-04-01 19:32:33,005 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-01 19:43:17,695 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
