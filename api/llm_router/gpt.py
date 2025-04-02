@@ -2,7 +2,6 @@ import os
 from openai import OpenAI
 from loguru import logger
 from typing import Optional, Dict, Any
-import httpx
 from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
@@ -10,8 +9,7 @@ load_dotenv()
 
 # Inicializa o cliente OpenAI diretamente
 client = OpenAI(
-    api_key=os.getenv("GPT_API_KEY"),
-    timeout=30.0
+    api_key=os.getenv("GPT_API_KEY")
 )
 
 async def generate_response(
