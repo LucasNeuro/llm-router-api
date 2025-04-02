@@ -12,3 +12,48 @@
 2025-04-01 21:53:15.903 | INFO     | __main__:start_server:42 - Iniciando servidor na porta 8000...
 2025-04-01 22:12:57.996 | INFO     | __main__:start_server:42 - Iniciando servidor na porta 8000...
 2025-04-01 22:14:08.313 | INFO     | __main__:start_server:42 - Iniciando servidor na porta 8000...
+2025-04-01 22:15:55.091 | INFO     | __main__:start_server:42 - Iniciando servidor na porta 8000...
+2025-04-01 22:21:37,479 - __main__ - INFO - Iniciando servidor na porta 8000...
+2025-04-01 22:21:38,348 - watchfiles.main - INFO - 5 changes detected
+2025-04-01 22:21:39,357 - watchfiles.main - INFO - 6 changes detected
+2025-04-01 22:21:39,725 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:51,435 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:52,262 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:52,620 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:53,073 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:53,484 - watchfiles.main - INFO - 2 changes detected
+2025-04-01 22:21:53,894 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:54,297 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:54,655 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:55,061 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:55,464 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:55,917 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:56,283 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:56,693 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:57,110 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:57,525 - watchfiles.main - INFO - 2 changes detected
+2025-04-01 22:21:57,932 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:58,286 - watchfiles.main - INFO - 2 changes detected
+2025-04-01 22:21:58,646 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:58,997 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:59,349 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:21:59,711 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:00,076 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:00,432 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:00,795 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:01,154 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:01,566 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:01,968 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:02,332 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:02,740 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:03,155 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:03,564 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:04,018 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:04,428 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:04,834 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:05,249 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:05,654 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:06,062 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:06,473 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:22:06,877 - watchfiles.main - INFO - 1 change detected
+2025-04-01 22:25:07.189 | INFO     | __main__:start_server:42 - Iniciando servidor na porta 8000...
