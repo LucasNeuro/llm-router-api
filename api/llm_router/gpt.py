@@ -8,24 +8,11 @@ from dotenv import load_dotenv
 # Carrega variáveis de ambiente
 load_dotenv()
 
-# Configuração do cliente OpenAI
-def init_openai_client():
-    """Inicializa o cliente OpenAI."""
-    api_key = os.getenv("GPT_API_KEY")
-    if not api_key:
-        raise ValueError("GPT_API_KEY não encontrada nas variáveis de ambiente")
-
-    # Inicializa o cliente OpenAI
-    client = OpenAI(
-        api_key=api_key,
-        timeout=30.0,
-        max_retries=2
-    )
-
-    return client
-
-# Inicializa o cliente OpenAI
-client = init_openai_client()
+# Inicializa o cliente OpenAI diretamente
+client = OpenAI(
+    api_key=os.getenv("GPT_API_KEY"),
+    timeout=30.0
+)
 
 async def generate_response(
     prompt: str,

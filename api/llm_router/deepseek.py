@@ -5,7 +5,8 @@ from openai import AsyncOpenAI
 # Initialize OpenAI client with API key
 client = AsyncOpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com/v1"
+    base_url="https://api.deepseek.com/v1",
+    timeout=30.0
 )
 
 async def call_deepseek(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
