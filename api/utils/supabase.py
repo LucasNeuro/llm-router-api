@@ -15,12 +15,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("As variáveis de ambiente SUPABASE_URL e SUPABASE_KEY precisam estar configuradas")
 
-# Inicializa o cliente do Supabase com configuração mínima
+# Inicializa o cliente do Supabase
 try:
-    supabase: Client = create_client(
-        supabase_url=SUPABASE_URL,
-        supabase_key=SUPABASE_KEY
-    )
+    # Usando a forma mais simples de inicialização
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     print(f"Erro ao inicializar Supabase: {str(e)}")
     raise e
