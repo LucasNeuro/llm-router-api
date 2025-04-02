@@ -1,7 +1,6 @@
 import os
 from typing import Dict, Any, Optional
 from openai import AsyncOpenAI
-from api.utils.logger import logger, log_llm_call, log_llm_response
 
 # Initialize OpenAI client with API key
 client = AsyncOpenAI(api_key=os.getenv("GPT_API_KEY"))
@@ -11,8 +10,6 @@ async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str
     Call GPT model with the given prompt using the new OpenAI API syntax
     """
     try:
-        log_llm_call("gpt", prompt)
-        
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -26,7 +23,6 @@ async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str
         )
         
         text = response.choices[0].message.content
-        log_llm_response("gpt", text)
         
         return {
             "text": text,
@@ -41,7 +37,6 @@ async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str
         
     except Exception as e:
         error_msg = f"Error calling GPT: {str(e)}"
-        logger.error(error_msg)
         return {
             "text": error_msg,
             "model": "gpt",
