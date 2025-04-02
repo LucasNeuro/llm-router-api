@@ -7,7 +7,7 @@ services:
     envVars:
       - key: PYTHONPATH
         value: .
-      - key: GPT_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
       - key: GEMINI_API_KEY
         sync: false
@@ -19,9 +19,11 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
-      - key: MEGA_API_INSTANCE_ID
+      - key: MEGAAPI_INSTANCE_ID
         sync: false
-      - key: MEGA_API_KEY
+      - key: MEGAAPI_API_KEY
         sync: false
-    healthCheckPath: /health
+      - key: MEGAAPI_TOKEN
+        sync: false
+    healthCheckPath: /api/v1/health
     autoDeploy: true

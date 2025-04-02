@@ -16,10 +16,10 @@ from datetime import datetime
 # Carrega variáveis de ambiente
 load_dotenv()
 
-# Configuração de logging simplificada (apenas console)
+# Configuração básica de logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 logger = logging.getLogger(__name__)
@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 # Cria a aplicação FastAPI
 app = FastAPI(
     title="LLM Router API",
-    description="API para roteamento inteligente de requisições para diferentes modelos de LLM",
+    description="API para roteamento inteligente de prompts para diferentes modelos de linguagem",
     version="1.0.0"
 )
 
-# Configura CORS
+# Configuração do CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,11 +41,11 @@ app.add_middleware(
 )
 
 # Inclui os routers
-from api.routers import chat, whatsapp, health
+from api.routers import chat, health, whatsapp
 
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
-app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["whatsapp"])
-app.include_router(health.router, tags=["health"])
+app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
 
 @app.get("/")
 async def root():

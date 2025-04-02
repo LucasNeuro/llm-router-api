@@ -289,180 +289,95 @@ def calculate_indicator_weights(text: str, indicators: Dict[str, bool]) -> Dict[
     return weights
 
 def analyze_indicators(prompt: str) -> Dict[str, Any]:
-    """Analisa o prompt para identificar indicadores importantes com calibração robusta."""
-    text = prompt.lower()
-    
-    # Indicadores primários (palavras-chave fortes)
-    primary_indicators = {
-        "complex": [
-            "implementação detalhada", "sistema distribuído",
-            "análise profunda", "arquitetura complexa",
-            "otimização avançada", "algoritmos complexos",
-            "baixo nível", "código complexo"
-        ],
-        "technical": [
-            "código fonte", "implementar função",
-            "debug", "compilação", "programação",
-            "desenvolvimento de software", "api rest",
-            "banco de dados", "deploy"
-        ],
-        "analytical": [
-            "compare e analise", "pros e contras",
-            "avalie criticamente", "analise comparativa",
-            "diferenças entre", "vantagens e desvantagens",
-            "análise de impacto"
-        ],
-        "simple": [
-            "qual é", "onde fica", "me diga",
-            "liste", "exemplos de", "o que é",
-            "definição de", "significado de"
-        ]
-    }
-    
-    # Indicadores secundários (contexto)
-    secondary_indicators = {
-        "complex": [
-            "otimização", "performance", "escalabilidade",
-            "segurança", "protocolo", "arquitetura"
-        ],
-        "technical": [
-            "função", "classe", "método",
-            "servidor", "cliente", "rede",
-            "sistema", "aplicação"
-        ],
-        "analytical": [
-            "compare", "analise", "avalie",
-            "considere", "examine", "discuta",
-            "impacto", "efeito"
-        ],
-        "simple": [
-            "como", "quando", "onde",
-            "quem", "por que", "qual"
-        ]
-    }
-    
-    # Sistema de pontuação calibrado
+    """Analisa o prompt e retorna indicadores de complexidade."""
+    # Inicializa contadores
     scores = {
-        "complex": 0,
-        "technical": 0,
-        "analytical": 0,
-        "simple": 0
+        "complex": 0.0,
+        "technical": 0.0,
+        "analytical": 0.0,
+        "simple": 0.0
     }
     
-    # Verificar indicadores primários (peso maior)
-    for category, indicators in primary_indicators.items():
-        for indicator in indicators:
-            if indicator in text:
-                scores[category] += 2.0
+    # Converte prompt para minúsculas para comparação
+    prompt_lower = prompt.lower()
     
-    # Verificar indicadores secundários (peso menor)
-    for category, indicators in secondary_indicators.items():
-        for indicator in indicators:
-            if indicator in text:
-                scores[category] += 1.0
-    
-    # Análise de comprimento e estrutura
-    word_count = len(text.split())
-    if word_count > 50:  # Prompts longos tendem a ser mais complexos
-        scores["complex"] += 1.0
-        scores["simple"] -= 1.0
-    elif word_count < 15:  # Prompts curtos tendem a ser mais simples
-        scores["simple"] += 1.0
-        scores["complex"] -= 1.0
-    
-    # Verificações adicionais de contexto
-    if "?" in text and word_count < 20:  # Perguntas curtas são geralmente simples
-        scores["simple"] += 1.0
-    if text.count("código") > 1 or text.count("implementação") > 1:  # Ênfase em código
-        scores["technical"] += 1.5
-    if text.count("compare") > 0 or text.count("analise") > 0:  # Ênfase em análise
-        scores["analytical"] += 1.5
+    # Análise de complexidade baseada em palavras-chave
+    for keyword in COMPLEXITY_KEYWORDS["high"]:
+        if keyword.lower() in prompt_lower:
+            scores["complex"] += 1.0
+            scores["technical"] += 0.5
+            
+    for keyword in COMPLEXITY_KEYWORDS["medium"]:
+        if keyword.lower() in prompt_lower:
+            scores["analytical"] += 0.5
+            
+    for keyword in COMPLEXITY_KEYWORDS["low"]:
+        if keyword.lower() in prompt_lower:
+            scores["simple"] += 1.0
+            
+    # Análise de tipo de tarefa
+    for keyword in TASK_KEYWORDS["technical"]:
+        if keyword.lower() in prompt_lower:
+            scores["technical"] += 1.0
+            scores["complex"] += 0.5
+            
+    for keyword in TASK_KEYWORDS["analysis"]:
+        if keyword.lower() in prompt_lower:
+            scores["analytical"] += 1.0
+            scores["complex"] += 0.5
+            
+    for keyword in TASK_KEYWORDS["complex"]:
+        if keyword.lower() in prompt_lower:
+            scores["complex"] += 1.0
+            scores["technical"] += 0.5
+            
+    # Normaliza os scores
+    total = sum(scores.values()) or 1.0
+    normalized_scores = {k: v/total * 5.0 for k, v in scores.items()}
     
     return {
-        "scores": scores,
-        "word_count": word_count,
-        "is_complex": scores["complex"] > max(scores["technical"], scores["analytical"], scores["simple"]),
-        "is_technical": scores["technical"] > max(scores["complex"], scores["analytical"], scores["simple"]),
-        "is_analytical": scores["analytical"] > max(scores["complex"], scores["technical"], scores["simple"]),
-        "is_simple": scores["simple"] > max(scores["complex"], scores["technical"], scores["analytical"])
+        "scores": normalized_scores,
+        "raw_scores": scores
     }
 
 def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
-    """Calcula pontuações para cada modelo com calibração robusta."""
-    scores = {
-        "gpt": 0.0,
-        "deepseek": 0.0,
-        "mistral": 0.0,
-        "gemini": 0.0
+    """Calcula a pontuação para cada modelo baseado nos indicadores."""
+    scores = indicators["scores"]
+    
+    # Pesos para cada aspecto por modelo
+    weights = {
+        "deepseek": {
+            "complex": 0.7,      # Aumentado para priorizar alta complexidade
+            "technical": 0.1,
+            "analytical": 0.1,
+            "simple": -0.7       # Penalidade maior para tarefas simples
+        },
+        "gemini": {
+            "complex": 0.2,      # Médio para complexidade
+            "technical": 0.2,
+            "analytical": 0.2,    # Maior peso em análise
+            "simple": 0.7        # Aceita tarefas simples também
+        },
+        "gpt": {
+            "complex": 0.2,
+            "technical": 0.7,    # Maior peso para técnico
+            "analytical": 0.2,
+            "simple": -0.10
+        },
+        "mistral": {
+            "complex": -0.3,     # Forte penalidade para complexidade
+            "technical": -0.2,    # Penalidade para técnico
+            "analytical": 0.1,
+            "simple": 0.10        # Muito alto para tarefas simples
+        }
     }
     
-    indicator_scores = indicators["scores"]
-    
-    # Regras de roteamento calibradas
-    if indicators["is_complex"] and indicator_scores["complex"] > 2.0:
-        # Tarefas muito complexas vão para DeepSeek
-        scores["deepseek"] = 0.7
-        scores["gpt"] = 0.1
-        scores["gemini"] = 0.1
-        scores["mistral"] = 0.1
+    model_scores = {}
+    for model, model_weights in weights.items():
+        score = sum(scores[aspect] * weight for aspect, weight in model_weights.items())
+        model_scores[model] = max(0.0, min(1.0, score / 5.0))  # Normaliza entre 0 e 1
         
-    elif indicators["is_technical"] and indicator_scores["technical"] > 2.0:
-        # Tarefas técnicas mas não muito complexas vão para Gemini
-        scores["gemini"] = 0.6
-        scores["deepseek"] = 0.2
-        scores["mistral"] = 0.1
-        scores["gpt"] = 0.1
-        
-    elif indicators["is_analytical"] and indicator_scores["analytical"] > 2.0:
-        # Tarefas analíticas vão para Mistral
-        scores["mistral"] = 0.6
-        scores["gemini"] = 0.2
-        scores["deepseek"] = 0.1
-        scores["gpt"] = 0.1
-        
-    elif indicators["is_simple"] or indicators["word_count"] < 15:
-        # Tarefas simples vão para GPT
-        scores["gpt"] = 0.6
-        scores["gemini"] = 0.2
-        scores["mistral"] = 0.1
-        scores["deepseek"] = 0.1
-    
-    else:
-        # Caso não tenha uma classificação clara, usar distribuição padrão
-        scores["gemini"] = 0.4
-        scores["gpt"] = 0.3
-        scores["mistral"] = 0.2
-        scores["deepseek"] = 0.1
-    
-    return scores
-
-def resolve_tiebreak(scores: Dict[str, float], weights: Dict[str, float], indicators: Dict[str, Any]) -> str:
-    """Resolve empates com regras estritas."""
-    max_score = max(scores.values())
-    tied_models = [model for model, score in scores.items() if abs(score - max_score) < 0.01]
-    
-    if len(tied_models) == 1:
-        return tied_models[0]
-    
-    # Regras de desempate baseadas nos indicadores
-    indicator_scores = indicators["scores"]
-    
-    if indicator_scores["complex"] > 2.0:
-        return "deepseek"
-    elif indicator_scores["technical"] > 2.0:
-        return "gemini"
-    elif indicator_scores["analytical"] > 2.0:
-        return "mistral"
-    elif indicator_scores["simple"] > 1.0 or indicators["word_count"] < 15:
-        return "gpt"
-    
-    # Se ainda houver empate, usar ordem de prioridade
-    priority = ["deepseek", "gemini", "mistral", "gpt"]
-    for model in priority:
-        if model in tied_models:
-            return model
-    
-    return tied_models[0]
+    return model_scores
 
 def classify_prompt(prompt: str) -> Dict[str, Any]:
     """Classifica o prompt e retorna o modelo mais adequado com metadados."""
@@ -479,14 +394,23 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
     scores_sorted = sorted(model_scores.values(), reverse=True)
     confidence = scores_sorted[0] - scores_sorted[1] if len(scores_sorted) > 1 else 1.0
     
+    # Define os thresholds para os indicadores
+    thresholds = {
+        "complex": 1.2,    # Reduzido para ser mais sensível
+        "technical": 1.2,  # Reduzido para ser mais sensível
+        "analytical": 1.2, # Reduzido para ser mais sensível
+        "simple": 0.7      # Reduzido para ser mais sensível
+    }
+    
     return {
-        "recommended_model": recommended_model,
+        "model": recommended_model,
         "confidence": confidence,
-            "model_scores": model_scores,
+        "model_scores": model_scores,
         "indicators": {
-            "complex": indicators["scores"]["complex"] > 2.0,
-            "technical": indicators["scores"]["technical"] > 2.0,
-            "analytical": indicators["scores"]["analytical"] > 2.0,
-            "simple": indicators["scores"]["simple"] > 1.0
-        }
+            "complex": indicators["scores"]["complex"] > thresholds["complex"],
+            "technical": indicators["scores"]["technical"] > thresholds["technical"],
+            "analytical": indicators["scores"]["analytical"] > thresholds["analytical"],
+            "simple": indicators["scores"]["simple"] > thresholds["simple"]
+        },
+        "raw_scores": indicators["scores"]  # Para debug
     }

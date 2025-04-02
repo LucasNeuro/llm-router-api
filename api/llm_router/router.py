@@ -1,75 +1,83 @@
 from typing import Dict, Any, Optional
 from .classifier_agent import classify_prompt
-from .gpt import call_gpt
+from .gpt import generate_response as call_gpt
 from .deepseek import call_deepseek
 from .mistral import call_mistral
 from .gemini import call_gemini
-from api.utils.logger import logger
+from loguru import logger
 
 class LLMRouter:
-    """Router para direcionar chamadas para diferentes modelos LLM"""
+    """Classe responsável por rotear prompts para o modelo mais apropriado"""
     
-    async def route_prompt(self, prompt: str, model: Optional[str] = None) -> Dict[str, Any]:
-        """Roteia o prompt para o modelo apropriado e retorna a resposta"""
-        try:
-            # Se um modelo específico não foi fornecido, classifica o prompt
-            if not model:
-                classification = classify_prompt(prompt)
-                model = classification["recommended_model"]
-                logger.info(f"Modelo escolhido: {model}")
-                logger.info(f"Pontuações: {classification['model_scores']}")
-                logger.info(f"Indicadores: {classification['indicators']}")
-            else:
-                classification = {
-                    "confidence": 1.0,
-                    "model_scores": {model: 1.0},
-                    "indicators": {
-                        "complex": False,
-                        "technical": False,
-                        "analytical": False,
-                        "simple": True
-                    }
-                }
-
-            # Chama o modelo apropriado
-            response = None
-            if model == "gpt":
-                response = await call_gpt(prompt)
-            elif model == "deepseek":
-                response = await call_deepseek(prompt)
-            elif model == "mistral":
-                response = await call_mistral(prompt)
-            elif model == "gemini":
-                response = await call_gemini(prompt)
-            else:
-                response = await call_gpt(prompt)  # GPT como fallback
-
-            # Garante que a resposta seja uma string
-            if not isinstance(response, str):
-                response = str(response)
-
-            # Retorna resposta com metadados
-            return {
-                "text": response,
-                "model": model,
-                "success": True,
-                "confidence": classification.get("confidence", 0.0),
-                "model_scores": classification.get("model_scores", {}),
-                "indicators": classification.get("indicators", {})
-            }
+    def __init__(self):
+        self.models = {
+            "gpt": call_gpt,
+            "deepseek": call_deepseek,
+            "mistral": call_mistral,
+            "gemini": call_gemini
+        }
         
+    async def route_prompt(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        **kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Roteia o prompt para o modelo mais apropriado.
+        
+        Args:
+            prompt: O texto do prompt
+            model: Modelo específico a ser usado (opcional)
+            **kwargs: Argumentos adicionais para a chamada do modelo
+            
+        Returns:
+            Dict com a resposta e metadados
+        """
+        try:
+            # Se um modelo específico foi solicitado, use-o
+            if model and model in self.models:
+                logger.info(f"Usando modelo específico: {model}")
+                response = await self.models[model](prompt, **kwargs)
+                # Garante que a resposta seja uma string
+                if isinstance(response, dict):
+                    response = response.get("text", str(response))
+                return {
+                    "text": str(response),
+                    "model": model,
+                    "success": True
+                }
+                
+            # Caso contrário, use o classificador para escolher o modelo
+            classification = classify_prompt(prompt)
+            chosen_model = classification["model"]
+            confidence = classification["confidence"]
+            model_scores = classification["model_scores"]
+            indicators = classification["indicators"]
+            
+            logger.info(f"Modelo escolhido: {chosen_model} (confiança: {confidence:.2f})")
+            logger.info(f"Scores dos modelos: {model_scores}")
+            logger.info(f"Indicadores: {indicators}")
+            
+            # Chama o modelo escolhido
+            response = await self.models[chosen_model](prompt, **kwargs)
+            # Garante que a resposta seja uma string
+            if isinstance(response, dict):
+                response = response.get("text", str(response))
+            
+            return {
+                "text": str(response),
+                "model": chosen_model,
+                "success": True,
+                "confidence": confidence,
+                "model_scores": model_scores,
+                "indicators": indicators
+            }
+            
         except Exception as e:
-            logger.error(f"Erro no router: {str(e)}")
+            logger.error(f"Erro ao rotear prompt: {str(e)}")
             return {
                 "text": f"Erro ao processar prompt: {str(e)}",
-                "model": "error",
-                "success": False,
-                "confidence": 0.0,
-                "model_scores": {},
-                "indicators": {
-                    "complex": False,
-                    "technical": False,
-                    "analytical": False,
-                    "simple": True
-                }
+                "model": model or "unknown",
+                "success": False
             }
