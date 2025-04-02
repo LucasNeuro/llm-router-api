@@ -1,4 +1,4 @@
-from supabase import create_client
+from supabase import create_client, Client
 import os
 from typing import Dict, Any
 import json
@@ -15,8 +15,21 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("As variáveis de ambiente SUPABASE_URL e SUPABASE_KEY precisam estar configuradas")
 
-# Inicializa o cliente do Supabase
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Inicializa o cliente do Supabase com configuração mínima
+try:
+    supabase: Client = create_client(
+        supabase_url=SUPABASE_URL,
+        supabase_key=SUPABASE_KEY,
+        options={
+            "auth": {
+                "autoRefreshToken": True,
+                "persistSession": False
+            }
+        }
+    )
+except Exception as e:
+    print(f"Erro ao inicializar Supabase: {str(e)}")
+    raise e
 
 async def save_llm_data(
     prompt: str,
