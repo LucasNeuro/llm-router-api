@@ -25,3 +25,7 @@
 2025-04-02 14:04:09,238 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
 2025-04-02 14:04:28,555 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
 2025-04-02 14:04:29,171 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 16:29:40,708 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+2025-04-02 16:29:43,193 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
+2025-04-02 17:34:14,913 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+2025-04-02 17:34:16,771 - httpx - INFO - HTTP Request: POST https://coiqezkovjeegzfmthdq.supabase.co/rest/v1/llm_router "HTTP/1.1 201 Created"
