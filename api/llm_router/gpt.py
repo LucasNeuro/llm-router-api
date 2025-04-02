@@ -9,45 +9,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuração do cliente OpenAI
-def get_openai_client() -> OpenAI:
-    """Cria e configura o cliente OpenAI com retry e timeout"""
-    try:
-        # Verifica se a API key está configurada
-        api_key = os.getenv("GPT_API_KEY")
-        if not api_key:
-            logger.error("GPT_API_KEY não encontrada nas variáveis de ambiente")
-            raise ValueError("GPT_API_KEY não configurada")
-            
-        # Log para debug
-        logger.info("GPT_API_KEY encontrada e configurada corretamente")
-            
-        # Configuração do proxy se existir
-        proxy = os.getenv("OPENAI_PROXY")
-        
-        # Cria o cliente com configurações básicas
-        client = OpenAI(
-            api_key=api_key,
-            timeout=httpx.Timeout(30.0, connect=10.0),
-            max_retries=3
-        )
-        
-        # Configura o proxy se existir
-        if proxy:
-            client.http_client.set_proxy(proxy)
-            
-        logger.info("Cliente OpenAI inicializado com sucesso")
-        return client
-    except Exception as e:
-        logger.error(f"Erro ao criar cliente OpenAI: {str(e)}")
-        raise
+def init_openai_client():
+    """Inicializa o cliente OpenAI."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY não encontrada nas variáveis de ambiente")
 
-# Inicializa o cliente
-try:
-    client = get_openai_client()
-    logger.info("Cliente OpenAI global inicializado com sucesso")
-except Exception as e:
-    logger.error(f"Falha ao inicializar cliente OpenAI global: {str(e)}")
-    client = None
+    # Inicializa o cliente OpenAI
+    client = OpenAI(
+        api_key=api_key,
+        timeout=30.0,
+        max_retries=2
+    )
+
+    return client
+
+# Inicializa o cliente OpenAI
+client = init_openai_client()
 
 async def generate_response(
     prompt: str,
