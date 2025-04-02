@@ -16,7 +16,10 @@ llm_router = LLMRouter()
 # Configurações da MegaAPI
 MEGAAPI_INSTANCE_ID = os.getenv("MEGAAPI_INSTANCE_ID")
 MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
-MEGAAPI_BASE_URL = "https://api.megaapi.io/v1"
+MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://apibusiness1.megaapi.com.br/v1")
+
+if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
+    raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
 
 class WhatsAppMessage(BaseModel):
     messageType: str
