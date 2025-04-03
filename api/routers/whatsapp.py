@@ -153,7 +153,15 @@ async def whatsapp_webhook(request: Request):
         try:
             # Processa a mensagem com o LLM Router
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
-            result = await llm_router.route_prompt(message.text)
+            
+            # Força resposta em português do Brasil
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial:
+
+{message.text}
+
+Lembre-se: Sua resposta DEVE ser em português do Brasil."""
+
+            result = await llm_router.route_prompt(prompt_ptbr)
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
             
             # Analisa custos
@@ -189,10 +197,20 @@ async def whatsapp_webhook(request: Request):
             # Prepara resposta no formato que a MegaAPI espera
             megaapi_response = {
                 "status": "success",
-                "message": response_data["text"],
-                "number": message.phone,
-                "instanceId": MEGAAPI_INSTANCE_ID
+                "response": {
+                    "type": "text",
+                    "message": response_data["text"]
+                },
+                "destination": message.phone,
+                "source": MEGAAPI_INSTANCE_ID
             }
+            
+            # Também vamos tentar enviar diretamente como backup
+            try:
+                await send_whatsapp_message(message.phone, response_data["text"])
+                logger.info("Mensagem enviada com sucesso via método direto")
+            except Exception as send_error:
+                logger.error(f"Erro ao enviar mensagem diretamente: {str(send_error)}")
             
             logger.info(f"Resposta final para MegaAPI: {json.dumps(megaapi_response, indent=2)}")
             return megaapi_response
