@@ -23,24 +23,25 @@ class WhatsAppMessage(BaseModel):
 
 async def send_to_n8n_webhook(phone: str, message: str, original_message: str):
     """
-    Envia a resposta para o webhook do n8n
+    Envia a resposta para o webhook do n8n usando método GET
     """
     try:
         # Formata o número do telefone
         if not phone.startswith("55"):
             phone = f"55{phone}"
 
-        payload = {
+        # Prepara os parâmetros para a query string
+        params = {
             "phone": phone,  # número formatado
             "message": message,  # resposta do LLM
             "original_message": original_message,  # mensagem original recebida
             "instance_id": "megabusiness-MoYuzQehcPQ"  # ID da instância MegaAPI
         }
 
-        logger.info(f"Enviando para n8n: {json.dumps(payload, indent=2)}")
+        logger.info(f"Enviando para n8n via GET: {json.dumps(params, indent=2)}")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(N8N_WEBHOOK_URL, json=payload)
+            response = await client.get(N8N_WEBHOOK_URL, params=params)
             response.raise_for_status()
             logger.info(f"Resposta do n8n: {response.status_code}")
             return response
