@@ -13,10 +13,11 @@ from api.utils.logger import logger
 router = APIRouter()
 llm_router = LLMRouter()
 
-# Configurações da MegaAPI
+# Configurações da MegaAPI e Make.com
 MEGAAPI_INSTANCE_ID = os.getenv("MEGAAPI_INSTANCE_ID")
 MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
 MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://apibusiness1.megaapi.com.br")
+MAKE_WEBHOOK_URL = "https://hook.us1.make.com/mt9gpj926wjwlrlx51cixwcr33vumyzi"
 
 if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
     raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
@@ -69,6 +70,33 @@ async def send_whatsapp_message(phone: str, message: str):
             logger.error(f"Response body: {e.response.text}")
         raise HTTPException(status_code=500, detail=f"Erro ao enviar mensagem: {str(e)}")
 
+async def send_to_make_webhook(phone: str, message: str, original_message: str):
+    """
+    Envia a resposta para o webhook do Make.com
+    """
+    try:
+        payload = {
+            "phone": phone,
+            "message": message,
+            "original_message": original_message,
+            "instance_id": "megabusiness-MoYuzQehcPQ"
+        }
+
+        logger.info(f"Enviando para Make.com: {json.dumps(payload, indent=2)}")
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(MAKE_WEBHOOK_URL, json=payload)
+            response.raise_for_status()
+            logger.info(f"Resposta do Make.com: {response.status_code}")
+            return response
+
+    except Exception as e:
+        logger.error(f"Erro ao enviar para Make.com: {str(e)}")
+        if isinstance(e, httpx.HTTPError):
+            logger.error(f"Status code: {e.response.status_code}")
+            logger.error(f"Response body: {e.response.text}")
+        raise e
+
 @router.post("/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
     """
@@ -77,7 +105,7 @@ async def whatsapp_webhook(request: Request):
     try:
         # Log do corpo da requisição bruto
         body = await request.body()
-        logger.info(f"Corpo da requisição bruto: {body.decode()}")  # Decodifica o corpo para string
+        logger.info(f"Corpo da requisição bruto: {body.decode()}")
 
         # Tenta fazer o parse do JSON
         try:
@@ -162,9 +190,19 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
             result = await llm_router.route_prompt(prompt_ptbr)
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
 
-            # Envia a resposta via WhatsApp
-            await send_whatsapp_message(message.phone, result["text"])
-            logger.info("Mensagem enviada com sucesso")
+            # Tenta enviar para o Make.com
+            try:
+                await send_to_make_webhook(message.phone, result["text"], message.text)
+                logger.info("Mensagem enviada com sucesso para o Make.com")
+            except Exception as make_error:
+                logger.error(f"Erro ao enviar para Make.com: {str(make_error)}")
+
+            # Tenta enviar diretamente via MegaAPI como backup
+            try:
+                await send_whatsapp_message(message.phone, result["text"])
+                logger.info("Mensagem enviada com sucesso via MegaAPI")
+            except Exception as megaapi_error:
+                logger.error(f"Erro ao enviar via MegaAPI: {str(megaapi_error)}")
 
             return {
                 "status": "success",
