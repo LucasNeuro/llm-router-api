@@ -289,7 +289,10 @@ def calculate_indicator_weights(text: str, indicators: Dict[str, bool]) -> Dict[
     return weights
 
 def analyze_indicators(prompt: str) -> Dict[str, Any]:
-    """Analisa o prompt e retorna indicadores de complexidade com análise refinada."""
+    """
+    Analisa os indicadores de complexidade do prompt
+    """
+    # Inicializa scores como float
     scores = {
         "complex": 0.0,
         "technical": 0.0,
@@ -297,155 +300,90 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
         "simple": 0.0
     }
     
-    prompt_lower = prompt.lower()
-    words = prompt_lower.split()
+    # Análise baseada em palavras-chave
+    for level, keywords in COMPLEXITY_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword.lower() in prompt.lower():
+                if level == "high":
+                    scores["complex"] += 0.5
+                elif level == "medium":
+                    scores["technical"] += 0.3
+                else:
+                    scores["simple"] += 0.2
     
-    # 1. Análise de Complexidade
-    # Palavras que indicam alta complexidade
-    high_complexity_terms = [
-        "análise detalhada", "profunda", "complexo", "avançado",
-        "implementação", "arquitetura", "sistema", "framework",
-        "metodologia", "teoria", "conceito", "paradigma",
-        "otimização", "algoritmo", "estrutura", "design"
-    ]
+    # Análise de tipos de tarefa
+    for task_type, keywords in TASK_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword.lower() in prompt.lower():
+                if task_type == "technical":
+                    scores["technical"] += 0.4
+                elif task_type == "analysis":
+                    scores["analytical"] += 0.3
+                elif task_type == "complex":
+                    scores["complex"] += 0.4
     
-    # Termos técnicos específicos
-    technical_terms = [
-        "código", "programação", "desenvolvimento", "api",
-        "banco de dados", "servidor", "rede", "protocolo",
-        "segurança", "criptografia", "autenticação", "deploy",
-        "pipeline", "infraestrutura", "cloud", "container"
-    ]
-    
-    # Termos de análise
-    analytical_terms = [
-        "compare", "analise", "avalie", "discuta",
-        "explique", "descreva", "examine", "investigue",
-        "considere", "explore", "sintetize", "relacione"
-    ]
-    
-    # Termos simples
-    simple_terms = [
-        "como", "qual", "onde", "quando", "liste",
-        "diga", "mostre", "exemplo", "básico", "simples",
-        "fácil", "rápido", "direto", "passo a passo"
-    ]
-
-    # 2. Análise Estrutural
-    sentence_length = len(words)
-    has_multiple_questions = prompt_lower.count("?") > 1
-    has_technical_requirements = any(term in prompt_lower for term in technical_terms)
-    has_complex_structure = ";" in prompt or "," in prompt
-    
-    # 3. Pontuação baseada em análise detalhada
-    
-    # Complexidade
-    for term in high_complexity_terms:
-        if term in prompt_lower:
-            scores["complex"] += 1.5
-            
-    if sentence_length > 30:
-        scores["complex"] += 1.0
-    if has_multiple_questions:
-        scores["complex"] += 0.5
-    if has_complex_structure:
-        scores["complex"] += 0.5
-        
-    # Técnico
-    for term in technical_terms:
-        if term in prompt_lower:
-            scores["technical"] += 1.0
-            
-    if has_technical_requirements:
-        scores["technical"] += 1.0
-        
-    # Analítico
-    for term in analytical_terms:
-        if term in prompt_lower:
-            scores["analytical"] += 1.0
-            
-    # Simplicidade
-    for term in simple_terms:
-        if term in prompt_lower:
-            scores["simple"] += 1.0
-            
-    if sentence_length < 15:
-        scores["simple"] += 1.0
-    if not has_complex_structure:
-        scores["simple"] += 0.5
-        
-    # 4. Normalização dos scores
-    total = sum(scores.values()) or 1.0
-    normalized_scores = {k: v/total * 5.0 for k, v in scores.items()}
-    
-    # 5. Análise adicional para debug
-    analysis = {
-        "sentence_length": sentence_length,
-        "has_multiple_questions": has_multiple_questions,
-        "has_technical_requirements": has_technical_requirements,
-        "has_complex_structure": has_complex_structure
+    # Determina os indicadores booleanos
+    indicators = {
+        "complex": scores["complex"] >= 0.8,
+        "technical": scores["technical"] >= 0.6,
+        "analytical": scores["analytical"] >= 0.5,
+        "simple": scores["simple"] >= 0.4
     }
     
-    return {
-        "scores": normalized_scores,
-        "raw_scores": scores,
-        "analysis": analysis
-    }
+    return indicators
 
 def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
-    """Calcula a pontuação para cada modelo com nova hierarquia."""
-    scores = indicators["scores"]
-    analysis = indicators["analysis"]
+    """
+    Calcula os scores para cada modelo baseado nos indicadores
+    """
+    scores = {
+        "deepseek": 0.0,
+        "gemini": 0.0,
+        "mistral": 0.0,
+        "gpt": 0.0
+    }
     
-    # Nova hierarquia de modelos (sem GPT)
+    # Pesos para cada modelo
     weights = {
         "deepseek": {
-            "complex": 0.9,      # Prioridade máxima para complexidade alta
-            "technical": 0.1,
-            "analytical": 0.1,
-            "simple": -0.9      # Forte penalidade para simplicidade
+            "complex": 0.7,  # Aumentado para priorizar complexidade
+            "technical": 0.6,
+            "analytical": 0.5,
+            "simple": -0.3  # Penalidade para mensagens simples
         },
         "gemini": {
-            "complex": 0.4,     # Foco em complexidade média
-            "technical": 0.6,   # Foco em questões técnicas
-            "analytical": 0.4,
+            "complex": 0.3,
+            "technical": 0.4,
+            "analytical": 0.3,
             "simple": 0.2
         },
         "mistral": {
-            "complex": -0.8,    # Forte penalidade para complexidade
-            "technical": -0.4,  # Penalidade para técnico
+            "complex": -0.3,  # Penalidade para mensagens complexas
+            "technical": 0.2,
             "analytical": 0.1,
-            "simple": 0.9       # Prioridade máxima para simplicidade
+            "simple": 0.9  # Aumentado para priorizar simplicidade
+        },
+        "gpt": {
+            "complex": 0.5,
+            "technical": 0.6,  # Aumentado para priorizar aspectos técnicos
+            "analytical": 0.5,
+            "simple": 0.1
         }
     }
     
-    # Cálculo de scores com ajustes baseados na análise
-    model_scores = {}
-    for model, model_weights in weights.items():
-        base_score = sum(scores[aspect] * weight for aspect, weight in model_weights.items())
-        
-        # Ajustes específicos por modelo
-        if model == "deepseek":
-            if analysis["sentence_length"] > 30:
-                base_score *= 1.3
-            if analysis["has_complex_structure"]:
-                base_score *= 1.2
-                
-        elif model == "gemini":
-            if 15 <= analysis["sentence_length"] <= 30:
-                base_score *= 1.2
-            if analysis["has_technical_requirements"]:
-                base_score *= 1.1
-                
-        elif model == "mistral":
-            if analysis["sentence_length"] < 15:
-                base_score *= 1.3
-            if not analysis["has_complex_structure"]:
-                base_score *= 1.2
-                
-        model_scores[model] = max(0.0, min(1.0, base_score / 5.0))
+    # Calcula scores baseado nos indicadores
+    for model in scores:
+        for indicator, value in indicators.items():
+            if value:
+                scores[model] += weights[model][indicator]
     
-    return model_scores
+    # Normaliza os scores para garantir que somem 1
+    total = sum(scores.values())
+    if total > 0:
+        for model in scores:
+            scores[model] = scores[model] / total
+    
+    return scores
 
 def classify_prompt(prompt: str) -> Dict[str, Any]:
     """Classifica o prompt com nova hierarquia de modelos."""
@@ -464,9 +402,9 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
     }
     
     # Determina o nível de complexidade
-    complexity_level = "high" if indicators["scores"]["complex"] > thresholds["complex"] else \
-                      "medium" if indicators["scores"]["technical"] > thresholds["technical"] else \
-                      "low" if indicators["scores"]["simple"] > thresholds["simple"] else "medium"
+    complexity_level = "high" if indicators["complex"] else \
+                      "medium" if indicators["technical"] > thresholds["technical"] else \
+                      "low" if indicators["simple"] > thresholds["simple"] else "medium"
     
     # Escolhe o modelo baseado na complexidade
     if complexity_level == "high" and model_scores["deepseek"] > 0.6:
@@ -488,12 +426,17 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
         "confidence": confidence,
             "model_scores": model_scores,
         "indicators": {
-            "complex": indicators["scores"]["complex"] > thresholds["complex"],
-            "technical": indicators["scores"]["technical"] > thresholds["technical"],
-            "analytical": indicators["scores"]["analytical"] > thresholds["analytical"],
-            "simple": indicators["scores"]["simple"] > thresholds["simple"]
+            "complex": indicators["complex"],
+            "technical": indicators["technical"],
+            "analytical": indicators["analytical"],
+            "simple": indicators["simple"]
         },
         "complexity_level": complexity_level,
-        "raw_scores": indicators["scores"],
-        "analysis": indicators["analysis"]
+        "raw_scores": model_scores,
+        "analysis": {
+            "complexity_level": complexity_level,
+            "task_nature": "unknown",
+            "key_aspects": [],
+            "explanation": "Analysis based on keywords and task type"
+        }
     }
