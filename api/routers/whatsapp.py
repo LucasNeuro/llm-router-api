@@ -77,14 +77,14 @@ async def whatsapp_webhook(request: Request):
     try:
         # Log do corpo da requisição bruto
         body = await request.body()
-        logger.info(f"Corpo da requisição bruto: {body}")
+        logger.info(f"Corpo da requisição bruto: {body.decode()}")  # Decodifica o corpo para string
 
         # Tenta fazer o parse do JSON
         try:
             payload = await request.json()
         except json.JSONDecodeError as e:
             logger.error(f"Erro ao decodificar JSON: {str(e)}")
-            logger.error(f"Corpo da requisição que causou erro: {body}")
+            logger.error(f"Corpo da requisição que causou erro: {body.decode()}")
             return {"status": "error", "reason": "invalid_json"}
 
         logger.info(f"Webhook recebido: {json.dumps(payload, indent=2)}")
@@ -94,7 +94,12 @@ async def whatsapp_webhook(request: Request):
             logger.error(f"Payload inválido, não é um dicionário: {payload}")
             return {"status": "error", "reason": "invalid_payload"}
 
-        # Verifica se é uma mensagem de texto
+        # Verifica se é uma mensagem de texto e não é um ACK
+        if payload.get("messageType") == "message.ack":
+            logger.info("É uma mensagem de confirmação (ACK), ignorando")
+            return {"status": "ignored", "reason": "ack_message"}
+
+        # Verifica se tem a mensagem
         if not payload.get("message"):
             logger.info("Não é uma mensagem de texto, ignorando")
             return {"status": "ignored", "reason": "not_text_message"}
@@ -143,16 +148,8 @@ async def whatsapp_webhook(request: Request):
             logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
             return {"status": "error", "reason": "invalid_message_format"}
 
-        # Gera ID único para a requisição
-        request_id = str(uuid.uuid4())
-        
-        # Log da requisição recebida
-        logger.info(f"Processando mensagem - ID: {request_id}")
-        logger.info(f"Texto: {message.text}")
-        logger.info(f"Enviando resposta para: {message.phone}")
-
+        # Processa a mensagem com o LLM Router
         try:
-            # Processa a mensagem com o LLM Router
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
             # Força resposta em português do Brasil
@@ -164,57 +161,15 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
 
             result = await llm_router.route_prompt(prompt_ptbr)
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
-            
-            # Analisa custos
-            cost_analysis = analyze_cost(result["model"], message.text, result["text"])
-            logger.info(f"Análise de custos: {json.dumps(cost_analysis, indent=2)}")
-            
-            # Prepara resposta
-            response_data = {
-                "text": result["text"],
-                "model": result["model"],
-                "success": result["success"],
-                "confidence": result.get("confidence"),
-                "model_scores": result.get("model_scores"),
-                "indicators": result.get("indicators"),
-                "cost_analysis": cost_analysis
-            }
-            logger.info(f"Resposta preparada: {json.dumps(response_data, indent=2)}")
 
-            # Salva no Supabase
-            logger.info("Salvando dados no Supabase...")
-            await save_llm_data(
-                prompt=message.text,
-                response=response_data["text"],
-                model=response_data["model"],
-                success=response_data["success"],
-                confidence=response_data["confidence"],
-                scores=response_data["model_scores"] or {},
-                indicators=response_data["indicators"] or {},
-                cost_analysis=cost_analysis,
-                request_id=request_id
-            )
+            # Envia a resposta via WhatsApp
+            await send_whatsapp_message(message.phone, result["text"])
+            logger.info("Mensagem enviada com sucesso")
 
-            # Prepara resposta no formato que a MegaAPI espera
-            megaapi_response = {
+            return {
                 "status": "success",
-                "response": {
-                    "type": "text",
-                    "message": response_data["text"]
-                },
-                "destination": message.phone,
-                "source": MEGAAPI_INSTANCE_ID
+                "message": "Mensagem processada e enviada com sucesso"
             }
-            
-            # Também vamos tentar enviar diretamente como backup
-            try:
-                await send_whatsapp_message(message.phone, response_data["text"])
-                logger.info("Mensagem enviada com sucesso via método direto")
-            except Exception as send_error:
-                logger.error(f"Erro ao enviar mensagem diretamente: {str(send_error)}")
-            
-            logger.info(f"Resposta final para MegaAPI: {json.dumps(megaapi_response, indent=2)}")
-            return megaapi_response
 
         except Exception as e:
             logger.error(f"Erro no processamento da mensagem: {str(e)}")
