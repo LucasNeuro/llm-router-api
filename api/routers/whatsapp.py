@@ -92,18 +92,20 @@ async def whatsapp_webhook(request: Request):
         message_data = payload.get("message", {})
         
         if isinstance(message_data, dict):
-            if "conversation" in message_data:
+            if "extendedTextMessage" in message_data:
+                message_text = message_data["extendedTextMessage"].get("text", "")
+            elif "conversation" in message_data:
                 message_text = message_data["conversation"]
             elif "text" in message_data:
                 message_text = message_data["text"].get("message", "")
 
         # Se não houver mensagem de texto, ignora
         if not message_text:
-            logger.info("Mensagem sem texto, ignorando")
+            logger.info(f"Mensagem sem texto extraível: {json.dumps(message_data, indent=2)}")
             return {"status": "ignored", "reason": "no_text_content"}
 
         # Log da mensagem extraída
-        logger.info(f"Mensagem extraída: {message_text}")
+        logger.info(f"Mensagem extraída com sucesso: {message_text}")
 
         # Extrai informações da mensagem
         try:
@@ -133,11 +135,13 @@ async def whatsapp_webhook(request: Request):
 
         try:
             # Processa a mensagem com o LLM Router
+            logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             result = await llm_router.route_prompt(message.text)
-            logger.info(f"Resposta do LLM Router: {result}")
+            logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
             
             # Analisa custos
             cost_analysis = analyze_cost(result["model"], message.text, result["text"])
+            logger.info(f"Análise de custos: {json.dumps(cost_analysis, indent=2)}")
             
             # Prepara resposta
             response_data = {
@@ -149,8 +153,10 @@ async def whatsapp_webhook(request: Request):
                 "indicators": result.get("indicators"),
                 "cost_analysis": cost_analysis
             }
+            logger.info(f"Resposta preparada: {json.dumps(response_data, indent=2)}")
 
             # Salva no Supabase
+            logger.info("Salvando dados no Supabase...")
             await save_llm_data(
                 prompt=message.text,
                 response=response_data["text"],
