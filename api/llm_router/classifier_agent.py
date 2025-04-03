@@ -486,7 +486,7 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
     return {
         "model": recommended_model,
         "confidence": confidence,
-        "model_scores": model_scores,
+            "model_scores": model_scores,
         "indicators": {
             "complex": indicators["scores"]["complex"] > thresholds["complex"],
             "technical": indicators["scores"]["technical"] > thresholds["technical"],
