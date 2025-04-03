@@ -63,35 +63,66 @@ async def whatsapp_webhook(request: Request):
     Webhook para receber mensagens do WhatsApp
     """
     try:
-        # Recebe o payload
-        payload = await request.json()
+        # Log do corpo da requisição bruto
+        body = await request.body()
+        logger.info(f"Corpo da requisição bruto: {body}")
+
+        # Tenta fazer o parse do JSON
+        try:
+            payload = await request.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"Erro ao decodificar JSON: {str(e)}")
+            logger.error(f"Corpo da requisição que causou erro: {body}")
+            return {"status": "error", "reason": "invalid_json"}
+
         logger.info(f"Webhook recebido: {json.dumps(payload, indent=2)}")
+
+        # Verifica se é uma mensagem válida
+        if not isinstance(payload, dict):
+            logger.error(f"Payload inválido, não é um dicionário: {payload}")
+            return {"status": "error", "reason": "invalid_payload"}
+
+        # Verifica se é uma mensagem de texto
+        if not payload.get("message"):
+            logger.info("Não é uma mensagem de texto, ignorando")
+            return {"status": "ignored", "reason": "not_text_message"}
 
         # Extrai a mensagem do campo correto
         message_text = None
-        if payload.get("message", {}).get("conversation"):
-            message_text = payload["message"]["conversation"]
-        elif payload.get("message", {}).get("text"):
-            message_text = payload["message"]["text"].get("message", "")
+        message_data = payload.get("message", {})
+        
+        if isinstance(message_data, dict):
+            if "conversation" in message_data:
+                message_text = message_data["conversation"]
+            elif "text" in message_data:
+                message_text = message_data["text"].get("message", "")
 
         # Se não houver mensagem de texto, ignora
         if not message_text:
-            return {"status": "ignored", "reason": "not_text_message"}
+            logger.info("Mensagem sem texto, ignorando")
+            return {"status": "ignored", "reason": "no_text_content"}
+
+        # Log da mensagem extraída
+        logger.info(f"Mensagem extraída: {message_text}")
 
         # Extrai informações da mensagem
-        phone = payload.get("key", {}).get("remoteJid", "").split("@")[0]
-        # Remove o prefixo "55" se existir
-        if phone.startswith("55"):
-            phone = phone[2:]
-            
-        message = WhatsAppMessage(
-            messageType=payload.get("messageType", "text"),
-            text=message_text,
-            phone=phone,
-            instanceId=payload.get("instance_key", ""),
-            messageId=payload.get("key", {}).get("id", ""),
-            timestamp=payload.get("messageTimestamp", 0)
-        )
+        try:
+            phone = payload.get("key", {}).get("remoteJid", "").split("@")[0]
+            # Remove o prefixo "55" se existir
+            if phone.startswith("55"):
+                phone = phone[2:]
+                
+            message = WhatsAppMessage(
+                messageType=payload.get("messageType", "text"),
+                text=message_text,
+                phone=phone,
+                instanceId=payload.get("instance_key", ""),
+                messageId=payload.get("key", {}).get("id", ""),
+                timestamp=payload.get("messageTimestamp", 0)
+            )
+        except Exception as e:
+            logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
+            return {"status": "error", "reason": "invalid_message_format"}
 
         # Gera ID único para a requisição
         request_id = str(uuid.uuid4())
@@ -100,49 +131,55 @@ async def whatsapp_webhook(request: Request):
         logger.info(f"Processando mensagem - ID: {request_id}")
         logger.info(f"Texto: {message.text}")
 
-        # Processa a mensagem com o LLM Router (mesmo padrão do chat)
-        result = await llm_router.route_prompt(message.text)
-        
-        # Analisa custos
-        cost_analysis = analyze_cost(result["model"], message.text, result["text"])
-        
-        # Prepara resposta no mesmo formato do chat
-        response_data = {
-            "text": result["text"],
-            "model": result["model"],
-            "success": result["success"],
-            "confidence": result.get("confidence"),
-            "model_scores": result.get("model_scores"),
-            "indicators": result.get("indicators"),
-            "cost_analysis": cost_analysis
-        }
+        try:
+            # Processa a mensagem com o LLM Router
+            result = await llm_router.route_prompt(message.text)
+            logger.info(f"Resposta do LLM Router: {result}")
+            
+            # Analisa custos
+            cost_analysis = analyze_cost(result["model"], message.text, result["text"])
+            
+            # Prepara resposta
+            response_data = {
+                "text": result["text"],
+                "model": result["model"],
+                "success": result["success"],
+                "confidence": result.get("confidence"),
+                "model_scores": result.get("model_scores"),
+                "indicators": result.get("indicators"),
+                "cost_analysis": cost_analysis
+            }
 
-        # Salva no Supabase
-        await save_llm_data(
-            prompt=message.text,
-            response=response_data["text"],
-            model=response_data["model"],
-            success=response_data["success"],
-            confidence=response_data["confidence"],
-            scores=response_data["model_scores"] or {},
-            indicators=response_data["indicators"] or {},
-            cost_analysis=cost_analysis,
-            request_id=request_id
-        )
+            # Salva no Supabase
+            await save_llm_data(
+                prompt=message.text,
+                response=response_data["text"],
+                model=response_data["model"],
+                success=response_data["success"],
+                confidence=response_data["confidence"],
+                scores=response_data["model_scores"] or {},
+                indicators=response_data["indicators"] or {},
+                cost_analysis=cost_analysis,
+                request_id=request_id
+            )
 
-        # Envia resposta via WhatsApp
-        await send_whatsapp_message(message.phone, response_data["text"])
+            # Envia resposta via WhatsApp
+            await send_whatsapp_message(message.phone, response_data["text"])
 
-        return {
-            "status": "success",
-            "request_id": request_id,
-            "model_used": response_data["model"],
-            "message_sent": True
-        }
+            return {
+                "status": "success",
+                "request_id": request_id,
+                "model_used": response_data["model"],
+                "message_sent": True
+            }
+
+        except Exception as e:
+            logger.error(f"Erro no processamento da mensagem: {str(e)}")
+            return {"status": "error", "reason": str(e)}
 
     except Exception as e:
         logger.error(f"Erro no webhook: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "reason": str(e)}
 
 @router.get("/whatsapp/status")
 async def whatsapp_status():
