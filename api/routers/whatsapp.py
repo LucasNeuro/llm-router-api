@@ -16,7 +16,7 @@ llm_router = LLMRouter()
 # Configurações da MegaAPI
 MEGAAPI_INSTANCE_ID = os.getenv("MEGAAPI_INSTANCE_ID")
 MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
-MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://api.megaapi.com.br")
+MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://apibusiness1.megaapi.com.br")
 
 if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
     raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
@@ -38,18 +38,15 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        url = "https://api.megaapi.com.br/v2/message/sendText"
+        url = f"{MEGAAPI_BASE_URL}/message/text"
         headers = {
             "Content-Type": "application/json",
-            "apikey": MEGAAPI_API_KEY
+            "Authorization": MEGAAPI_API_KEY
         }
         payload = {
-            "messageData": {
-                "to": phone,
-                "text": message
-            },
-            "apiKey": MEGAAPI_API_KEY,
-            "instanceId": MEGAAPI_INSTANCE_ID
+            "id": MEGAAPI_INSTANCE_ID,
+            "to": f"{phone}@s.whatsapp.net",
+            "text": message
         }
 
         logger.info(f"Enviando mensagem para {phone}")
@@ -57,7 +54,7 @@ async def send_whatsapp_message(phone: str, message: str):
         logger.info(f"Headers: {json.dumps(headers, indent=2)}")
         logger.info(f"Payload: {json.dumps(payload, indent=2)}")
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             response_data = response.json()
@@ -216,16 +213,16 @@ async def whatsapp_status():
     Verifica status da conexão com WhatsApp
     """
     try:
-        url = "https://api.megaapi.com.br/v2/instance/info"
+        url = f"{MEGAAPI_BASE_URL}/instance/info"
         headers = {
             "Content-Type": "application/json",
-            "apikey": MEGAAPI_API_KEY
+            "Authorization": MEGAAPI_API_KEY
         }
         params = {
-            "instanceId": MEGAAPI_INSTANCE_ID
+            "id": MEGAAPI_INSTANCE_ID
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=headers, params=params)
             response.raise_for_status()
             status = response.json()
