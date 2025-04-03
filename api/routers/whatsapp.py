@@ -109,6 +109,7 @@ async def whatsapp_webhook(request: Request):
 
         # Extrai informações da mensagem
         try:
+            # Extrai o número do remetente do remoteJid
             phone = payload.get("key", {}).get("remoteJid", "").split("@")[0]
             # Remove o prefixo "55" se existir
             if phone.startswith("55"):
@@ -122,6 +123,10 @@ async def whatsapp_webhook(request: Request):
                 messageId=payload.get("key", {}).get("id", ""),
                 timestamp=payload.get("messageTimestamp", 0)
             )
+            
+            # Log do número do remetente
+            logger.info(f"Número do remetente: {phone}")
+            
         except Exception as e:
             logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
             return {"status": "error", "reason": "invalid_message_format"}
@@ -132,6 +137,7 @@ async def whatsapp_webhook(request: Request):
         # Log da requisição recebida
         logger.info(f"Processando mensagem - ID: {request_id}")
         logger.info(f"Texto: {message.text}")
+        logger.info(f"Enviando resposta para: {message.phone}")
 
         try:
             # Processa a mensagem com o LLM Router
@@ -169,14 +175,17 @@ async def whatsapp_webhook(request: Request):
                 request_id=request_id
             )
 
-            # Envia resposta via WhatsApp
+            # Envia resposta via WhatsApp para o número correto
+            logger.info(f"Enviando resposta para o número: {message.phone}")
             await send_whatsapp_message(message.phone, response_data["text"])
+            logger.info("Resposta enviada com sucesso")
 
             return {
                 "status": "success",
                 "request_id": request_id,
                 "model_used": response_data["model"],
-                "message_sent": True
+                "message_sent": True,
+                "recipient": message.phone
             }
 
         except Exception as e:
