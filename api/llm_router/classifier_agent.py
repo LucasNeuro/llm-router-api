@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 from api.utils.logger import logger
 import re
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -300,6 +301,21 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
         "simple": 0.0
     }
     
+    # Análise inicial - pergunta simples
+    simple_patterns = [
+        r"^qual[^?]*\?",  # Perguntas começando com "qual"
+        r"^onde[^?]*\?",  # Perguntas começando com "onde"
+        r"^quem[^?]*\?",  # Perguntas começando com "quem"
+        r"^quando[^?]*\?",  # Perguntas começando com "quando"
+        r"^como[^?]*\?",  # Perguntas começando com "como"
+        r"^o que[^?]*\?",  # Perguntas começando com "o que"
+        r"^por que[^?]*\?"  # Perguntas começando com "por que"
+    ]
+    
+    # Se a pergunta corresponde a um padrão simples
+    if any(re.match(pattern, prompt.lower()) for pattern in simple_patterns):
+        scores["simple"] += 0.6  # Aumenta significativamente o score de simplicidade
+    
     # Análise baseada em palavras-chave
     for level, keywords in COMPLEXITY_KEYWORDS.items():
         for keyword in keywords:
@@ -309,7 +325,7 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
                 elif level == "medium":
                     scores["technical"] += 0.3
                 else:
-                    scores["simple"] += 0.2
+                    scores["simple"] += 0.3  # Aumentado de 0.2 para 0.3
     
     # Análise de tipos de tarefa
     for task_type, keywords in TASK_KEYWORDS.items():
@@ -321,14 +337,32 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
                     scores["analytical"] += 0.3
                 elif task_type == "complex":
                     scores["complex"] += 0.4
+                elif task_type == "factual":
+                    scores["simple"] += 0.3  # Adicionado para aumentar score de simplicidade
     
-    # Determina os indicadores booleanos
+    # Análise de comprimento e estrutura
+    words = prompt.split()
+    if len(words) <= 10:  # Perguntas curtas são geralmente simples
+        scores["simple"] += 0.4
+    if "?" in prompt and len(prompt) < 50:  # Perguntas diretas e curtas
+        scores["simple"] += 0.3
+    
+    # Determina os indicadores booleanos com thresholds ajustados
     indicators = {
-        "complex": scores["complex"] >= 0.8,
-        "technical": scores["technical"] >= 0.6,
-        "analytical": scores["analytical"] >= 0.5,
-        "simple": scores["simple"] >= 0.4
+        "complex": scores["complex"] >= 0.5,
+        "technical": scores["technical"] >= 0.4,
+        "analytical": scores["analytical"] >= 0.3,
+        "simple": scores["simple"] >= 0.3  # Reduzido de 0.4 para 0.3
     }
+    
+    # Garante que pelo menos um indicador seja True
+    if not any(indicators.values()):
+        # Se nenhum indicador foi ativado, marca como simples por padrão
+        indicators["simple"] = True
+    
+    # Log dos scores e indicadores
+    logger.info(f"Scores calculados: {json.dumps(scores, indent=2)}")
+    logger.info(f"Indicadores determinados: {json.dumps(indicators, indent=2)}")
     
     return indicators
 
@@ -346,10 +380,10 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
     # Pesos para cada modelo
     weights = {
         "deepseek": {
-            "complex": 0.7,  # Aumentado para priorizar complexidade
+            "complex": 0.7,
             "technical": 0.6,
             "analytical": 0.5,
-            "simple": -0.3  # Penalidade para mensagens simples
+            "simple": -0.8  # Aumentada a penalidade para mensagens simples
         },
         "gemini": {
             "complex": 0.3,
@@ -358,16 +392,16 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
             "simple": 0.2
         },
         "mistral": {
-            "complex": -0.3,  # Penalidade para mensagens complexas
-            "technical": 0.2,
-            "analytical": 0.1,
-            "simple": 0.9  # Aumentado para priorizar simplicidade
+            "complex": -0.8,  # Aumentada a penalidade para mensagens complexas
+            "technical": -0.3,  # Adicionada penalidade para mensagens técnicas
+            "analytical": -0.2,  # Adicionada penalidade para mensagens analíticas
+            "simple": 0.9  # Aumentada a prioridade para mensagens simples
         },
         "gpt": {
             "complex": 0.5,
-            "technical": 0.6,  # Aumentado para priorizar aspectos técnicos
+            "technical": 0.6,
             "analytical": 0.5,
-            "simple": 0.1
+            "simple": -0.3
         }
     }
     
@@ -377,11 +411,18 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
             if value:
                 scores[model] += weights[model][indicator]
     
+    # Garante um score mínimo positivo para o Mistral em perguntas simples
+    if indicators["simple"] and not any([indicators["complex"], indicators["technical"], indicators["analytical"]]):
+        scores["mistral"] = max(scores["mistral"], 0.7)
+    
     # Normaliza os scores para garantir que somem 1
-    total = sum(scores.values())
+    total = sum(abs(score) for score in scores.values())
     if total > 0:
         for model in scores:
             scores[model] = scores[model] / total
+    
+    # Log dos scores calculados
+    logger.info(f"Scores dos modelos calculados: {json.dumps(scores, indent=2)}")
     
     return scores
 

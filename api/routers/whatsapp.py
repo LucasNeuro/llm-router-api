@@ -16,7 +16,7 @@ llm_router = LLMRouter()
 # Configurações da MegaAPI
 MEGAAPI_INSTANCE_ID = os.getenv("MEGAAPI_INSTANCE_ID")
 MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
-MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://apibusiness1.megaapi.com.br")
+MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://api.megaapi.com.br")
 
 if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
     raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
@@ -38,18 +38,20 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        url = f"{MEGAAPI_BASE_URL}/message/text"
+        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {MEGAAPI_API_KEY}"
         }
         payload = {
-            "id": MEGAAPI_INSTANCE_ID,
-            "to": phone,
-            "text": message
+            "instance_id": MEGAAPI_INSTANCE_ID,
+            "number": phone,
+            "message": message
         }
 
         logger.info(f"Enviando mensagem para {phone}: {message}")
+        logger.info(f"URL: {url}")
+        logger.info(f"Headers: {json.dumps(headers, indent=2)}")
         logger.info(f"Payload: {json.dumps(payload, indent=2)}")
         
         async with httpx.AsyncClient() as client:
