@@ -34,6 +34,10 @@ async def send_whatsapp_message(phone: str, message: str):
     Envia mensagem via MegaAPI
     """
     try:
+        # Formata o número do telefone
+        if not phone.startswith("55"):
+            phone = f"55{phone}"
+            
         url = f"{MEGAAPI_BASE_URL}/message/text"
         headers = {
             "Content-Type": "application/json",
@@ -46,12 +50,14 @@ async def send_whatsapp_message(phone: str, message: str):
         }
 
         logger.info(f"Enviando mensagem para {phone}: {message}")
+        logger.info(f"Payload: {json.dumps(payload, indent=2)}")
         
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            logger.info(f"Resposta do envio: {response.json()}")
-            return response.json()
+            response_data = response.json()
+            logger.info(f"Resposta do envio: {json.dumps(response_data, indent=2)}")
+            return response_data
 
     except Exception as e:
         logger.error(f"Erro ao enviar mensagem WhatsApp: {str(e)}")
