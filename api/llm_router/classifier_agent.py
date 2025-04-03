@@ -383,7 +383,7 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
             "complex": 0.7,
             "technical": 0.6,
             "analytical": 0.5,
-            "simple": -0.8  # Aumentada a penalidade para mensagens simples
+            "simple": -0.12  # Aumentada a penalidade para mensagens simples
         },
         "gemini": {
             "complex": 0.3,
