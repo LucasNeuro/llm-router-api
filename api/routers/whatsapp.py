@@ -71,7 +71,7 @@ async def send_whatsapp_message(phone: str, message: str):
             logger.error(f"Response body: {e.response.text}")
         raise HTTPException(status_code=500, detail=f"Erro ao enviar mensagem: {str(e)}")
 
-async def send_to_make(phone: str, message: str, original_message: str):
+async def send_to_make(phone: str, message: str, original_message: str, model: str = None):
     """
     Envia mensagem processada para o webhook do Make
     """
@@ -80,6 +80,7 @@ async def send_to_make(phone: str, message: str, original_message: str):
             "phone": phone,
             "response": message,
             "original_message": original_message,
+            "model": model or "Não especificado",
             "timestamp": int(time.time())
         }
 
@@ -192,8 +193,13 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
             result = await llm_router.route_prompt(prompt_ptbr)
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
 
-            # Envia para o webhook do Make
-            await send_to_make(message.phone, result["text"], message.text)
+            # Envia para o webhook do Make com o modelo usado
+            await send_to_make(
+                phone=message.phone, 
+                message=result["text"], 
+                original_message=message.text,
+                model=result.get("model", "Não especificado")
+            )
             logger.info("Mensagem enviada para Make com sucesso")
 
             # Envia a resposta via WhatsApp para o número do remetente
