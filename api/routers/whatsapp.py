@@ -38,15 +38,17 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage"
+        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/{MEGAAPI_INSTANCE_ID}/text"
         headers = {
+            "accept": "*/*",
             "Content-Type": "application/json",
-            "Authorization": MEGAAPI_API_KEY
+            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
         }
         payload = {
-            "number": phone,
-            "message": message,
-            "instanceId": MEGAAPI_INSTANCE_ID
+            "messageData": {
+                "to": phone,
+                "text": message
+            }
         }
 
         logger.info(f"Enviando mensagem para {phone}")
@@ -231,8 +233,9 @@ async def whatsapp_status():
     try:
         url = f"{MEGAAPI_BASE_URL}/rest/instance/status"
         headers = {
+            "accept": "*/*",
             "Content-Type": "application/json",
-            "Authorization": MEGAAPI_API_KEY
+            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
         }
         params = {
             "instanceId": MEGAAPI_INSTANCE_ID
