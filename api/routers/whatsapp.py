@@ -4,23 +4,14 @@ from typing import Optional, Dict, Any
 import httpx
 import os
 from ..llm_router.router import LLMRouter
-from ..llm_router.cost_analyzer import analyze_cost
-from ..utils.supabase import save_llm_data
-import uuid
 import json
 from api.utils.logger import logger
 
 router = APIRouter()
 llm_router = LLMRouter()
 
-# Configurações da MegaAPI e Make.com
-MEGAAPI_INSTANCE_ID = os.getenv("MEGAAPI_INSTANCE_ID")
-MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
-MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://apibusiness1.megaapi.com.br")
-MAKE_WEBHOOK_URL = "https://hook.us1.make.com/mt9gpj926wjwlrlx51cixwcr33vumyzi"
-
-if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
-    raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
+# Configuração do n8n webhook
+N8N_WEBHOOK_URL = "https://neurolucas.app.n8n.cloud/webhook-test/02dbe3ee-757e-46e7-b9fa-5a2ba6267b6a"
 
 class WhatsAppMessage(BaseModel):
     messageType: str
@@ -30,68 +21,32 @@ class WhatsAppMessage(BaseModel):
     messageId: str
     timestamp: int
 
-async def send_whatsapp_message(phone: str, message: str):
+async def send_to_n8n_webhook(phone: str, message: str, original_message: str):
     """
-    Envia mensagem via MegaAPI
+    Envia a resposta para o webhook do n8n
     """
     try:
         # Formata o número do telefone
         if not phone.startswith("55"):
             phone = f"55{phone}"
-            
-        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/megabusiness-MoYuzQehcPQ/text"
-        headers = {
-            "accept": "*/*",
-            "Content-Type": "application/json"
-        }
+
         payload = {
-            "messageData": {
-                "to": phone,
-                "text": message
-            }
+            "phone": phone,  # número formatado
+            "message": message,  # resposta do LLM
+            "original_message": original_message,  # mensagem original recebida
+            "instance_id": "megabusiness-MoYuzQehcPQ"  # ID da instância MegaAPI
         }
 
-        logger.info(f"Enviando mensagem para {phone}")
-        logger.info(f"URL: {url}")
-        logger.info(f"Headers: {json.dumps(headers, indent=2)}")
-        logger.info(f"Payload: {json.dumps(payload, indent=2)}")
+        logger.info(f"Enviando para n8n: {json.dumps(payload, indent=2)}")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await client.post(N8N_WEBHOOK_URL, json=payload)
             response.raise_for_status()
-            response_data = response.json()
-            logger.info(f"Resposta do envio: {json.dumps(response_data, indent=2)}")
-            return response_data
-
-    except Exception as e:
-        logger.error(f"Erro ao enviar mensagem WhatsApp: {str(e)}")
-        if isinstance(e, httpx.HTTPError):
-            logger.error(f"Status code: {e.response.status_code}")
-            logger.error(f"Response body: {e.response.text}")
-        raise HTTPException(status_code=500, detail=f"Erro ao enviar mensagem: {str(e)}")
-
-async def send_to_make_webhook(phone: str, message: str, original_message: str):
-    """
-    Envia a resposta para o webhook do Make.com
-    """
-    try:
-        payload = {
-            "phone": phone,
-            "message": message,
-            "original_message": original_message,
-            "instance_id": "megabusiness-MoYuzQehcPQ"
-        }
-
-        logger.info(f"Enviando para Make.com: {json.dumps(payload, indent=2)}")
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(MAKE_WEBHOOK_URL, json=payload)
-            response.raise_for_status()
-            logger.info(f"Resposta do Make.com: {response.status_code}")
+            logger.info(f"Resposta do n8n: {response.status_code}")
             return response
 
     except Exception as e:
-        logger.error(f"Erro ao enviar para Make.com: {str(e)}")
+        logger.error(f"Erro ao enviar para n8n: {str(e)}")
         if isinstance(e, httpx.HTTPError):
             logger.error(f"Status code: {e.response.status_code}")
             logger.error(f"Response body: {e.response.text}")
@@ -190,23 +145,13 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
             result = await llm_router.route_prompt(prompt_ptbr)
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
 
-            # Tenta enviar para o Make.com
-            try:
-                await send_to_make_webhook(message.phone, result["text"], message.text)
-                logger.info("Mensagem enviada com sucesso para o Make.com")
-            except Exception as make_error:
-                logger.error(f"Erro ao enviar para Make.com: {str(make_error)}")
-
-            # Tenta enviar diretamente via MegaAPI como backup
-            try:
-                await send_whatsapp_message(message.phone, result["text"])
-                logger.info("Mensagem enviada com sucesso via MegaAPI")
-            except Exception as megaapi_error:
-                logger.error(f"Erro ao enviar via MegaAPI: {str(megaapi_error)}")
+            # Envia para o n8n
+            await send_to_n8n_webhook(message.phone, result["text"], message.text)
+            logger.info("Mensagem enviada com sucesso para o n8n")
 
             return {
                 "status": "success",
-                "message": "Mensagem processada e enviada com sucesso"
+                "message": "Mensagem processada e enviada para o n8n"
             }
 
         except Exception as e:
