@@ -38,15 +38,15 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        url = f"{MEGAAPI_BASE_URL}/message/text"
+        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage"
         headers = {
             "Content-Type": "application/json",
             "Authorization": MEGAAPI_API_KEY
         }
         payload = {
-            "id": MEGAAPI_INSTANCE_ID,
-            "to": f"{phone}@s.whatsapp.net",
-            "text": message
+            "number": phone,
+            "message": message,
+            "instanceId": MEGAAPI_INSTANCE_ID
         }
 
         logger.info(f"Enviando mensagem para {phone}")
@@ -186,18 +186,16 @@ async def whatsapp_webhook(request: Request):
                 request_id=request_id
             )
 
-            # Envia resposta via WhatsApp para o número correto
-            logger.info(f"Enviando resposta para o número: {message.phone}")
-            await send_whatsapp_message(message.phone, response_data["text"])
-            logger.info("Resposta enviada com sucesso")
-
-            return {
+            # Prepara resposta no formato que a MegaAPI espera
+            megaapi_response = {
                 "status": "success",
-                "request_id": request_id,
-                "model_used": response_data["model"],
-                "message_sent": True,
-                "recipient": message.phone
+                "message": response_data["text"],
+                "number": message.phone,
+                "instanceId": MEGAAPI_INSTANCE_ID
             }
+            
+            logger.info(f"Resposta final para MegaAPI: {json.dumps(megaapi_response, indent=2)}")
+            return megaapi_response
 
         except Exception as e:
             logger.error(f"Erro no processamento da mensagem: {str(e)}")
@@ -213,13 +211,13 @@ async def whatsapp_status():
     Verifica status da conexão com WhatsApp
     """
     try:
-        url = f"{MEGAAPI_BASE_URL}/instance/info"
+        url = f"{MEGAAPI_BASE_URL}/rest/instance/status"
         headers = {
             "Content-Type": "application/json",
             "Authorization": MEGAAPI_API_KEY
         }
         params = {
-            "id": MEGAAPI_INSTANCE_ID
+            "instanceId": MEGAAPI_INSTANCE_ID
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
