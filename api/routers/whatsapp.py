@@ -38,16 +38,14 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        instance_key = MEGAAPI_INSTANCE_ID.split("-")[1] if "-" in MEGAAPI_INSTANCE_ID else MEGAAPI_INSTANCE_ID
-        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/{instance_key}/text"
+        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/megabusiness-MoYuzQehcPQ/text"
         headers = {
             "accept": "*/*",
-            "Content-Type": "application/json",
-            "Authorization": MEGAAPI_API_KEY
+            "Content-Type": "application/json"
         }
         payload = {
             "messageData": {
-                "to": f"{phone}@s.whatsapp.net",
+                "to": phone,
                 "text": message
             }
         }
@@ -232,15 +230,13 @@ async def whatsapp_status():
     Verifica status da conexão com WhatsApp
     """
     try:
-        instance_key = MEGAAPI_INSTANCE_ID.split("-")[1] if "-" in MEGAAPI_INSTANCE_ID else MEGAAPI_INSTANCE_ID
         url = f"{MEGAAPI_BASE_URL}/rest/instance/status"
         headers = {
             "accept": "*/*",
-            "Content-Type": "application/json",
-            "Authorization": MEGAAPI_API_KEY
+            "Content-Type": "application/json"
         }
         params = {
-            "instanceId": instance_key
+            "instanceId": "megabusiness-MoYuzQehcPQ"
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -250,7 +246,7 @@ async def whatsapp_status():
 
         return {
             "status": "success",
-            "instance_id": MEGAAPI_INSTANCE_ID,
+            "instance_id": "megabusiness-MoYuzQehcPQ",
             "whatsapp_status": status
         }
 
@@ -258,6 +254,6 @@ async def whatsapp_status():
         logger.error(f"Erro ao verificar status: {str(e)}")
         return {
             "status": "error",
-            "instance_id": MEGAAPI_INSTANCE_ID,
+            "instance_id": "megabusiness-MoYuzQehcPQ",
             "error": str(e)
         }
