@@ -38,15 +38,16 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/{MEGAAPI_INSTANCE_ID}/text"
+        instance_key = MEGAAPI_INSTANCE_ID.split("-")[1] if "-" in MEGAAPI_INSTANCE_ID else MEGAAPI_INSTANCE_ID
+        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/{instance_key}/text"
         headers = {
             "accept": "*/*",
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
+            "Authorization": MEGAAPI_API_KEY
         }
         payload = {
             "messageData": {
-                "to": phone,
+                "to": f"{phone}@s.whatsapp.net",
                 "text": message
             }
         }
@@ -231,14 +232,15 @@ async def whatsapp_status():
     Verifica status da conexão com WhatsApp
     """
     try:
+        instance_key = MEGAAPI_INSTANCE_ID.split("-")[1] if "-" in MEGAAPI_INSTANCE_ID else MEGAAPI_INSTANCE_ID
         url = f"{MEGAAPI_BASE_URL}/rest/instance/status"
         headers = {
             "accept": "*/*",
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
+            "Authorization": MEGAAPI_API_KEY
         }
         params = {
-            "instanceId": MEGAAPI_INSTANCE_ID
+            "instanceId": instance_key
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
