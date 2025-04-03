@@ -34,20 +34,23 @@ async def send_whatsapp_message(phone: str, message: str):
     Envia mensagem via MegaAPI
     """
     try:
-        url = f"{MEGAAPI_BASE_URL}/instances/{MEGAAPI_INSTANCE_ID}/messages/text"
+        url = f"{MEGAAPI_BASE_URL}/message/text"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {MEGAAPI_API_KEY}"
         }
         payload = {
-            "phone": phone,
-            "message": message,
-            "quotedMessageId": None
+            "id": MEGAAPI_INSTANCE_ID,
+            "to": phone,
+            "text": message
         }
 
+        logger.info(f"Enviando mensagem para {phone}: {message}")
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
+            logger.info(f"Resposta do envio: {response.json()}")
             return response.json()
 
     except Exception as e:
@@ -76,10 +79,15 @@ async def whatsapp_webhook(request: Request):
             return {"status": "ignored", "reason": "not_text_message"}
 
         # Extrai informações da mensagem
+        phone = payload.get("key", {}).get("remoteJid", "").split("@")[0]
+        # Remove o prefixo "55" se existir
+        if phone.startswith("55"):
+            phone = phone[2:]
+            
         message = WhatsAppMessage(
             messageType=payload.get("messageType", "text"),
             text=message_text,
-            phone=payload.get("key", {}).get("remoteJid", "").split("@")[0],
+            phone=phone,
             instanceId=payload.get("instance_key", ""),
             messageId=payload.get("key", {}).get("id", ""),
             timestamp=payload.get("messageTimestamp", 0)
