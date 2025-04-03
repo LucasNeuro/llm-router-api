@@ -16,7 +16,7 @@ llm_router = LLMRouter()
 # Configurações da MegaAPI
 MEGAAPI_INSTANCE_ID = os.getenv("MEGAAPI_INSTANCE_ID")
 MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
-MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://api.megaapi.com.br/v1")
+MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://api.megaapi.com.br")
 
 if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
     raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
@@ -38,18 +38,16 @@ async def send_whatsapp_message(phone: str, message: str):
         if not phone.startswith("55"):
             phone = f"55{phone}"
             
-        url = f"{MEGAAPI_BASE_URL}/send-message"
+        url = f"{MEGAAPI_BASE_URL}/api/send-message"
         headers = {
             "Content-Type": "application/json",
-            "apikey": MEGAAPI_API_KEY
+            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
         }
         payload = {
-            "instanceId": MEGAAPI_INSTANCE_ID,
-            "to": f"{phone}@s.whatsapp.net",
+            "id": MEGAAPI_INSTANCE_ID,
+            "to": phone,
             "type": "text",
-            "data": {
-                "text": message
-            }
+            "message": message
         }
 
         logger.info(f"Enviando mensagem para {phone}")
@@ -216,11 +214,12 @@ async def whatsapp_status():
     Verifica status da conexão com WhatsApp
     """
     try:
-        url = f"{MEGAAPI_BASE_URL}/instances/{MEGAAPI_INSTANCE_ID}/status"
+        url = f"{MEGAAPI_BASE_URL}/api/status"
         headers = {"Authorization": f"Bearer {MEGAAPI_API_KEY}"}
+        params = {"id": MEGAAPI_INSTANCE_ID}
 
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
+            response = await client.get(url, headers=headers, params=params)
             response.raise_for_status()
             status = response.json()
 
