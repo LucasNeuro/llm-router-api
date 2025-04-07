@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import httpx
@@ -6,6 +6,7 @@ import os
 from ..llm_router.router import LLMRouter
 from ..llm_router.cost_analyzer import analyze_cost
 from ..utils.supabase import save_llm_data
+from ..utils.conversation_memory import conversation_manager
 import uuid
 import json
 from api.utils.logger import logger
@@ -100,15 +101,22 @@ async def send_to_make(phone: str, message: str, original_message: str, model: s
             logger.error(f"Response body: {e.response.text}")
         raise HTTPException(status_code=500, detail=f"Erro ao enviar para Make: {str(e)}")
 
+async def cleanup_sessions(background_tasks: BackgroundTasks):
+    """Tarefa em background para limpar sessões inativas"""
+    await conversation_manager.cleanup_inactive_sessions()
+
 @router.post("/whatsapp/webhook")
-async def whatsapp_webhook(request: Request):
+async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Webhook para receber mensagens do WhatsApp
     """
     try:
+        # Adiciona tarefa de limpeza em background
+        background_tasks.add_task(cleanup_sessions, background_tasks)
+        
         # Log do corpo da requisição bruto
         body = await request.body()
-        logger.info(f"Corpo da requisição bruto: {body.decode()}")  # Decodifica o corpo para string
+        logger.info(f"Corpo da requisição bruto: {body.decode()}")
 
         # Tenta fazer o parse do JSON
         try:
@@ -190,30 +198,59 @@ async def whatsapp_webhook(request: Request):
 
 Lembre-se: Sua resposta DEVE ser em português do Brasil."""
 
-            result = await llm_router.route_prompt(prompt_ptbr)
+            # Usa o LLM Router com contexto da conversa
+            result = await llm_router.route_prompt(
+                prompt=prompt_ptbr,
+                sender_phone=message.phone
+            )
+            
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
+
+            # Gera ID único para a requisição
+            request_id = str(uuid.uuid4())
+
+            # Analisa custos
+            cost_analysis = analyze_cost(result["model"], prompt_ptbr, result["text"])
+
+            # Salva dados no Supabase
+            await save_llm_data(
+                prompt=message.text,
+                response=result["text"],
+                model=result["model"],
+                success=result["success"],
+                confidence=result.get("confidence"),
+                scores=result.get("model_scores", {}),
+                indicators=result.get("indicators", {}),
+                cost_analysis=cost_analysis,
+                request_id=request_id
+            )
 
             # Envia para o webhook do Make com o modelo usado
             await send_to_make(
                 phone=message.phone, 
                 message=result["text"], 
                 original_message=message.text,
-                model=result.get("model", "Não especificado")
+                model=result["model"]
             )
-            logger.info("Mensagem enviada para Make com sucesso")
 
-            # Envia a resposta via WhatsApp para o número do remetente
+            # Envia resposta via WhatsApp
             await send_whatsapp_message(message.phone, result["text"])
-            logger.info(f"Mensagem enviada via WhatsApp com sucesso para o número: {message.phone}")
 
             return {
                 "status": "success",
-                "message": "Mensagem processada e enviada com sucesso",
-                "recipient": message.phone
+                "messageId": message.messageId,
+                "model": result["model"],
+                "has_context": result.get("has_context", False)
             }
 
         except Exception as e:
-            logger.error(f"Erro no processamento da mensagem: {str(e)}")
+            logger.error(f"Erro ao processar mensagem: {str(e)}")
+            # Em caso de erro, tenta enviar uma mensagem de erro para o usuário
+            try:
+                error_message = "Desculpe, tive um problema ao processar sua mensagem. Pode tentar novamente?"
+                await send_whatsapp_message(message.phone, error_message)
+            except:
+                pass
             return {"status": "error", "reason": str(e)}
 
     except Exception as e:

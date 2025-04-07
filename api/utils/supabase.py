@@ -4,6 +4,7 @@ from typing import Dict, Any
 import json
 from datetime import datetime
 from dotenv import load_dotenv
+from loguru import logger
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -15,12 +16,16 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("As variáveis de ambiente SUPABASE_URL e SUPABASE_KEY precisam estar configuradas")
 
+logger.info(f"Inicializando cliente Supabase com URL: {SUPABASE_URL}")
+
 # Inicializa o cliente do Supabase
 try:
-    # Usando a forma mais simples de inicialização
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    logger.info("Cliente Supabase inicializado com sucesso")
 except Exception as e:
-    print(f"Erro ao inicializar Supabase: {str(e)}")
+    logger.error(f"Erro ao inicializar Supabase: {str(e)}")
+    logger.error("Verifique se as credenciais estão corretas e se o serviço está disponível")
+    logger.exception("Stacktrace completo:")
     raise e
 
 async def save_llm_data(
@@ -77,5 +82,5 @@ async def save_llm_data(
         return result
         
     except Exception as e:
-        print(f"Erro ao salvar dados no Supabase: {str(e)}")
-        return None 
+        logger.error(f"Erro ao salvar dados no Supabase: {str(e)}")
+        return None
