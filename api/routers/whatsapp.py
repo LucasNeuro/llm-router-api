@@ -224,66 +224,61 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
             # Prompt melhorado para respostas mais naturais e engajadoras
-            prompt_ptbr = f"""Você é um assistente virtual amigável e prestativo. Por favor, responda em português do Brasil de forma natural e engajadora, seguindo estas diretrizes:
+            prompt_ptbr = f"""Você é um assistente virtual amigável e prestativo. Responda em português do Brasil de forma natural e engajadora.
 
-Contexto da conversa:
-- Mantenha um tom amigável e acolhedor
-- Use emojis ocasionalmente para dar mais vida à conversa 😊
-- Formate suas respostas com parágrafos e quebras de linha para melhor legibilidade
-- Evite respostas muito longas - seja conciso mas completo
+Diretrizes:
+1. Use um tom amigável e acolhedor 😊
+2. Seja empático e compreensivo
+3. Use linguagem simples e acessível
+4. Formate bem sua resposta (parágrafos, quebras de linha)
+5. Seja conciso mas completo
+6. Use emojis ocasionalmente quando apropriado
 
 Pergunta/Mensagem do usuário: {message.text}
 
-Instruções específicas:
-1. Comece sua resposta com uma breve introdução ou reconhecimento da pergunta
-2. Desenvolva o assunto de forma clara e organizada
-3. Use exemplos práticos quando relevante
-4. Termine com uma conclusão ou pergunta que mantenha o engajamento
-5. Assine sua resposta identificando qual modelo você é
+Lembre-se:
+- Comece reconhecendo a pergunta/mensagem
+- Mantenha o engajamento
+- Termine com uma conclusão ou pergunta que incentive o diálogo
+- SEMPRE assine sua resposta no final identificando qual modelo você é
 
-Lembre-se: 
-- Mantenha um tom conversacional natural
-- Use linguagem simples e acessível
-- Seja empático e compreensivo
-- Formate bem sua resposta para fácil leitura no WhatsApp
+Sua resposta deve terminar com:
+[Respondido por: <seu_modelo>]"""
 
-Por favor, termine SEMPRE sua resposta com uma assinatura no formato:
-[Respondido por: <nome_do_modelo>]"""
-
-            # Usa o LLM Router com contexto da conversa e força roteamento
+            # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(
                 prompt=prompt_ptbr,
-                sender_phone=message.phone,
-                force_routing=True  # Força o router a escolher o melhor modelo
+                sender_phone=message.phone
             )
             
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
 
             # Adiciona a assinatura do modelo se não estiver presente
             response_text = result["text"]
+            model_name = result.get("model", "unknown")
             if "[Respondido por:" not in response_text:
-                response_text = f"{response_text}\n\n[Respondido por: {result['model']}]"
+                response_text = f"{response_text}\n\n[Respondido por: {model_name}]"
 
             # Salva a resposta do assistente na memória
             await conversation_manager.add_message(
                 sender_phone=message.phone,
                 role="assistant",
                 content=response_text,
-                model_used=result["model"]
+                model_used=model_name
             )
 
             # Gera ID único para a requisição
             request_id = str(uuid.uuid4())
 
             # Analisa custos
-            cost_analysis = analyze_cost(result["model"], prompt_ptbr, response_text)
+            cost_analysis = analyze_cost(model_name, prompt_ptbr, response_text)
 
             # Salva dados no Supabase
             try:
                 await save_llm_data(
                     prompt=message.text,
                     response=response_text,
-                    model=result["model"],
+                    model=model_name,
                     success=result["success"],
                     confidence=result.get("confidence"),
                     scores=result.get("model_scores", {}),
@@ -300,7 +295,7 @@ Por favor, termine SEMPRE sua resposta com uma assinatura no formato:
                     phone=message.phone, 
                     message=response_text,
                     original_message=message.text,
-                    model=result["model"]
+                    model=model_name
                 )
             except Exception as e:
                 logger.error(f"Erro ao enviar para Make: {str(e)}")
@@ -311,7 +306,7 @@ Por favor, termine SEMPRE sua resposta com uma assinatura no formato:
             return {
                 "status": "success",
                 "messageId": message.messageId,
-                "model": result["model"],
+                "model": model_name,
                 "has_context": result.get("has_context", False)
             }
 
