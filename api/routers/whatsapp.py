@@ -182,6 +182,13 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             
             # Log do número do remetente
             logger.info(f"Número do remetente: {phone}")
+
+            # Salva a mensagem do usuário na memória
+            await conversation_manager.add_message(
+                sender_phone=phone,
+                role="user",
+                content=message_text
+            )
             
         except Exception as e:
             logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
@@ -205,6 +212,14 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
             )
             
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
+
+            # Salva a resposta do assistente na memória
+            await conversation_manager.add_message(
+                sender_phone=message.phone,
+                role="assistant",
+                content=result["text"],
+                model_used=result["model"]
+            )
 
             # Gera ID único para a requisição
             request_id = str(uuid.uuid4())
