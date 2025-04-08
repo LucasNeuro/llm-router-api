@@ -426,85 +426,58 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
     
     return scores
 
-def classify_prompt(prompt: str, indicators: dict = None) -> dict:
-    """
-    Classifica o prompt e escolhe o modelo mais apropriado
+def classify_prompt(prompt: str) -> Dict[str, Any]:
+    """Classifica o prompt com nova hierarquia de modelos."""
+    # Analisa os indicadores
+    indicators = analyze_indicators(prompt)
     
-    Args:
-        prompt: O texto do prompt
-        indicators: Dicionário com indicadores adicionais
-        
-    Returns:
-        Dict com o modelo escolhido e metadados
-    """
-    try:
-        # Inicializa scores
-        scores = {
-            "gpt": 0.0,
-            "deepseek": 0.0,
-            "mistral": 0.0,
-            "gemini": 0.0
+    # Calcula pontuações dos modelos
+    model_scores = calculate_model_scores(indicators)
+    
+    # Thresholds ajustados para nova hierarquia
+    thresholds = {
+        "complex": 1.5,    # Aumentado para complexidade alta
+        "technical": 1.3,  # Ajustado para questões técnicas
+        "analytical": 1.2,
+        "simple": 0.8
+    }
+    
+    # Determina o nível de complexidade
+    complexity_level = "high" if indicators["complex"] else \
+                      "medium" if indicators["technical"] > thresholds["technical"] else \
+                      "low" if indicators["simple"] > thresholds["simple"] else "medium"
+    
+    # Escolhe o modelo baseado na complexidade
+    if complexity_level == "high" and model_scores["deepseek"] > 0.6:
+        recommended_model = "deepseek"
+    elif complexity_level == "medium" and model_scores["gemini"] > 0.6:
+        recommended_model = "gemini"
+    elif complexity_level == "low" and model_scores["mistral"] > 0.6:
+        recommended_model = "mistral"
+    else:
+        # Se nenhum modelo tem confiança suficiente, escolhe o com maior score
+        recommended_model = max(model_scores.items(), key=lambda x: x[1])[0]
+    
+    # Calcula confiança
+    scores_sorted = sorted(model_scores.values(), reverse=True)
+    confidence = scores_sorted[0] - scores_sorted[1] if len(scores_sorted) > 1 else 1.0
+    
+    return {
+        "model": recommended_model,
+        "confidence": confidence,
+            "model_scores": model_scores,
+        "indicators": {
+            "complex": indicators["complex"],
+            "technical": indicators["technical"],
+            "analytical": indicators["analytical"],
+            "simple": indicators["simple"]
+        },
+        "complexity_level": complexity_level,
+        "raw_scores": model_scores,
+        "analysis": {
+            "complexity_level": complexity_level,
+            "task_nature": "unknown",
+            "key_aspects": [],
+            "explanation": "Analysis based on keywords and task type"
         }
-        
-        # Análise básica do texto
-        text_length = len(prompt)
-        has_code = "```" in prompt or any(keyword in prompt.lower() for keyword in ["código", "programação", "função", "def ", "class "])
-        has_math = any(symbol in prompt for symbol in ["=", "+", "-", "*", "/", "^", "√"]) or any(keyword in prompt.lower() for keyword in ["calcule", "matemática", "equação"])
-        is_conversation = bool(indicators.get("has_conversation_history")) if indicators else False
-        message_type = indicators.get("message_type") if indicators else None
-        
-        # Ajusta scores baseado em características do texto
-        if text_length < 100:  # Textos curtos
-            scores["mistral"] += 0.3
-            scores["gemini"] += 0.2
-        elif text_length > 500:  # Textos longos
-            scores["gpt"] += 0.3
-            scores["deepseek"] += 0.2
-            
-        if has_code:  # Conteúdo relacionado a código
-            scores["deepseek"] += 0.4
-            scores["gpt"] += 0.3
-            
-        if has_math:  # Conteúdo matemático
-            scores["deepseek"] += 0.3
-            scores["mistral"] += 0.2
-            
-        if is_conversation:  # Contexto conversacional
-            scores["gpt"] += 0.3
-            scores["gemini"] += 0.2
-            
-        if message_type == "whatsapp":  # Mensagens do WhatsApp
-            scores["mistral"] += 0.2
-            scores["gemini"] += 0.2
-            
-        # Normaliza os scores
-        total = sum(scores.values())
-        if total > 0:
-            scores = {model: score/total for model, score in scores.items()}
-            
-        # Escolhe o modelo com maior score
-        chosen_model = max(scores.items(), key=lambda x: x[1])[0]
-        confidence = scores[chosen_model]
-        
-        return {
-            "model": chosen_model,
-            "confidence": confidence,
-            "model_scores": scores,
-            "indicators": {
-                "text_length": text_length,
-                "has_code": has_code,
-                "has_math": has_math,
-                "is_conversation": is_conversation,
-                "message_type": message_type
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Erro na classificação: {str(e)}")
-        # Em caso de erro, retorna Mistral como fallback
-        return {
-            "model": "mistral",
-            "confidence": 0.5,
-            "model_scores": {"mistral": 0.5, "gpt": 0.0, "deepseek": 0.0, "gemini": 0.0},
-            "indicators": {}
-        }
+    }
