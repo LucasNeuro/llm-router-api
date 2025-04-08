@@ -216,34 +216,19 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             
         except Exception as e:
             logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
-            logger.error(f"Payload completo: {json.dumps(payload, indent=2)}")
             return {"status": "error", "reason": "invalid_message_format"}
 
         # Processa a mensagem com o LLM Router
         try:
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
-            # Prompt melhorado para respostas mais naturais e engajadoras
-            prompt_ptbr = f"""Você é um assistente virtual amigável e prestativo. Responda em português do Brasil de forma natural e engajadora.
+            # Força resposta em português do Brasil
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial:
 
-                                Diretrizes:
-                                1. Use um tom amigável e acolhedor 😊
-                                2. Seja empático e compreensivo
-                                3. Use linguagem simples e acessível
-                                4. Formate bem sua resposta (parágrafos, quebras de linha)
-                                5. Seja conciso mas completo
-                                6. Use emojis ocasionalmente quando apropriado
+{message.text}
 
-                                Pergunta/Mensagem do usuário: {message.text}
+Lembre-se: Sua resposta DEVE ser em português do Brasil."""
 
-                                Lembre-se:
-                                - Comece reconhecendo a pergunta/mensagem
-                                - Mantenha o engajamento
-                                - Termine com uma conclusão ou pergunta que incentive o diálogo
-                                - SEMPRE assine sua resposta no final identificando qual modelo você é
-
-                                Sua resposta deve terminar com:
-                                [Respondido por: <seu_modelo>]"""
             # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(
                 prompt=prompt_ptbr,
@@ -267,33 +252,25 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             cost_analysis = analyze_cost(result["model"], prompt_ptbr, result["text"])
 
             # Salva dados no Supabase
-            try:
-                await save_llm_data(
-                    prompt=message.text,
-                    response=result["text"],
-                    model=result["model"],
-                    success=result["success"],
-                    confidence=result.get("confidence"),
-                    scores=result.get("model_scores", {}),
-                    indicators=result.get("indicators", {}),
-                    cost_analysis=cost_analysis,
-                    request_id=request_id
-                )
-            except Exception as e:
-                logger.error(f"Erro ao salvar no Supabase: {str(e)}")
-                # Continua a execução mesmo com erro no Supabase
+            await save_llm_data(
+                prompt=message.text,
+                response=result["text"],
+                model=result["model"],
+                success=result["success"],
+                confidence=result.get("confidence"),
+                scores=result.get("model_scores", {}),
+                indicators=result.get("indicators", {}),
+                cost_analysis=cost_analysis,
+                request_id=request_id
+            )
 
             # Envia para o webhook do Make com o modelo usado
-            try:
-                await send_to_make(
-                    phone=message.phone, 
-                    message=result["text"], 
-                    original_message=message.text,
-                    model=result["model"]
-                )
-            except Exception as e:
-                logger.error(f"Erro ao enviar para Make: {str(e)}")
-                # Continua a execução mesmo com erro no Make
+            await send_to_make(
+                phone=message.phone, 
+                message=result["text"], 
+                original_message=message.text,
+                model=result["model"]
+            )
 
             # Envia resposta via WhatsApp
             await send_whatsapp_message(message.phone, result["text"])
