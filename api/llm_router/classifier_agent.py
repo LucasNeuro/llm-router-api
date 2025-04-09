@@ -388,24 +388,25 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
         "complex": 1.5,    # Aumentado para complexidade alta
         "technical": 1.3,  # Ajustado para questões técnicas
         "analytical": 1.2,
-        "simple": 0.8
+        "simple": 0.5      # Reduzido para favorecer mensagens simples
     }
     
     # Determina o nível de complexidade
     complexity_level = "high" if indicators["complex"] else \
+                      "low" if indicators["simple"] > thresholds["simple"] else \
                       "medium" if indicators["technical"] > thresholds["technical"] else \
-                      "low" if indicators["simple"] > thresholds["simple"] else "medium"
+                      "low"  # Default para low em vez de medium
     
     # Escolhe o modelo baseado na complexidade
     if complexity_level == "high" and model_scores["deepseek"] > 0.6:
         recommended_model = "deepseek"
     elif complexity_level == "medium" and model_scores["gemini"] > 0.6:
         recommended_model = "gemini"
-    elif complexity_level == "low" and model_scores["mistral"] > 0.6:
+    elif complexity_level == "low" or model_scores["mistral"] > 0.4:  # Reduzido threshold do Mistral
         recommended_model = "mistral"
     else:
-        # Se nenhum modelo tem confiança suficiente, escolhe o com maior score
-        recommended_model = max(model_scores.items(), key=lambda x: x[1])[0]
+        # Se nenhum modelo tem confiança suficiente, usa Mistral como fallback
+        recommended_model = "mistral"
     
     # Calcula confiança
     scores_sorted = sorted(model_scores.values(), reverse=True)

@@ -254,14 +254,16 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
                 clean_text = clean_text.split("Lembre-se:")[0].strip()
             
             # Força resposta em português do Brasil e trata como pergunta
-            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial a seguinte mensagem:
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e profissional a seguinte mensagem:
 
-{clean_text}
+                            {clean_text}
 
-Lembre-se:
-1. Mantenha o tom natural e amigável
-2. Seja prestativo e forneça informações relevantes
-3. Use linguagem coloquial do Brasil"""
+                            Instruções:
+                            1. Use linguagem natural e amigável, mas profissional
+                            2. Seja direto e objetivo nas respostas
+                            3. Mantenha um tom cordial e prestativo
+                            4. Use português brasileiro coloquial, mas sem gírias excessivas
+                            5. Evite personagens fictícios ou personas específicas"""
 
             # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(
