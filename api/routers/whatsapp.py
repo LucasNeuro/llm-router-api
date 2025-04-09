@@ -155,11 +155,10 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
 
         logger.info(f"Webhook recebido: {json.dumps(payload, indent=2)}")
 
-        # Verifica se é uma mensagem do próprio bot (melhorada)
-        if (payload.get("key", {}).get("fromMe", False) or 
-            payload.get("messageType") == "message.ack" or
-            "instance_key" in payload):
-            logger.info("Mensagem enviada pelo bot ou confirmação, ignorando")
+        # Verifica se é uma mensagem do próprio bot ou confirmação
+        if (payload.get("messageType") == "message.ack" or
+            (payload.get("key", {}).get("fromMe", False) and "instance_key" in payload)):
+            logger.info("Mensagem de confirmação ou do bot, ignorando")
             return {"status": "ignored", "reason": "bot_message"}
 
         # Extrai o ID da mensagem para deduplicação
