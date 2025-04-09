@@ -152,20 +152,15 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
 
         logger.info(f"Webhook recebido: {json.dumps(payload, indent=2)}")
 
-        # Verifica se é uma mensagem do próprio bot
-        if payload.get("key", {}).get("fromMe", False):
-            logger.info("Mensagem enviada pelo bot, ignorando")
-            return {"status": "ignored", "reason": "bot_message"}
-
-        # Verifica se é uma mensagem de confirmação
-        if payload.get("messageType") == "message.ack":
-            logger.info("É uma mensagem de confirmação (ACK), ignorando")
-            return {"status": "ignored", "reason": "ack_message"}
-
         # Verifica se é uma mensagem válida
         if not isinstance(payload, dict):
             logger.error(f"Payload inválido, não é um dicionário: {payload}")
             return {"status": "error", "reason": "invalid_payload"}
+
+        # Verifica se é uma mensagem de texto e não é um ACK
+        if payload.get("messageType") == "message.ack":
+            logger.info("É uma mensagem de confirmação (ACK), ignorando")
+            return {"status": "ignored", "reason": "ack_message"}
 
         # Verifica se tem a mensagem
         if not payload.get("message"):
@@ -234,25 +229,16 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         try:
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
-            # Remove instruções anteriores se existirem
-            clean_text = message.text
-            if "Por favor, responda em português do Brasil" in clean_text:
-                clean_text = message.text.split("Por favor, responda em português do Brasil")[0].strip()
-            if "Lembre-se:" in clean_text:
-                clean_text = clean_text.split("Lembre-se:")[0].strip()
-            
             # Força resposta em português do Brasil e trata como pergunta
-            prompt_ptbr = f"""Você é um assistente virtual prestativo e amigável. 
-                            Responda à seguinte mensagem em português do Brasil, de forma natural e direta:
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial a seguinte pergunta:
 
-                            Mensagem: "{clean_text}"
+{message.text}
 
-                            Importante:
-                            1. Responda ESPECIFICAMENTE à mensagem acima
-                            2. Não invente personagens ou histórias fictícias
-                            3. Seja direto e relevante
-                            4. Use linguagem natural do Brasil
-                            5. Mantenha o foco na pergunta/mensagem do usuário"""
+Lembre-se:
+1. Sua resposta DEVE ser em português do Brasil
+2. Trate a mensagem como uma pergunta ou pedido de informação
+3. Seja sempre prestativo e forneça informações relevantes
+4. Use linguagem natural e amigável"""
 
             # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(

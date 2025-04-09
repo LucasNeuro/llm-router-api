@@ -289,44 +289,45 @@ class ConversationManager:
             logger.error(f"Erro ao adicionar mensagem: {str(e)}")
             logger.exception("Stacktrace completo:")
 
-    async def format_conversation_for_llm(self, sender_phone: str) -> str:
-        """Formata a conversa para envio ao LLM"""
+    async def format_conversation_for_llm(self, sender_phone: str, max_tokens: int = 4000) -> str:
+        """Formata a conversa para o LLM com contexto inteligente"""
         try:
+            # Verifica se a memória está ativa
+            is_active = await self._get_memory_status(sender_phone)
+            if not is_active:
+                logger.info(f"Memória desativada para {sender_phone}, retornando contexto vazio")
+                return ""
+
+            # Recupera o registro de memória
             memory = await self._get_or_create_memory(sender_phone)
-            if not memory or "conversation_memory" not in memory:
-                return ""
-
-            messages = memory["conversation_memory"].get("messages", [])
-            if not messages:
-                return ""
-
-            # Formata o histórico de forma mais estruturada
-            formatted_history = "Histórico da conversa:\n\n"
+            messages = memory["conversation_memory"]["messages"]
+            topic_changes = memory["conversation_memory"].get("topic_changes", [])
             
-            # Pega as últimas 10 mensagens para manter o contexto relevante
-            recent_messages = messages[-10:]
+            # Se houver mudanças de tópico, usa apenas as mensagens desde a última mudança
+            if topic_changes:
+                last_topic_change = topic_changes[-1]
+                last_change_index = last_topic_change["message_index"]
+                messages = messages[last_change_index:]
+                logger.info(f"Usando mensagens após mudança de tópico (índice {last_change_index})")
             
-            for msg in recent_messages:
-                role = "Usuário" if msg["role"] == "user" else "Assistente"
-                formatted_history += f"{role}: {msg['content']}\n\n"
-
-            # Adiciona instruções claras para o modelo
-            prompt_template = f"""
-{formatted_history}
-Por favor, use o histórico acima para contextualizar suas respostas.
-Mantenha um tom conversacional e natural em português do Brasil.
-Você pode referenciar informações das mensagens anteriores quando relevante.
-
-Lembre-se:
-1. Você tem acesso ao histórico da conversa
-2. Pode usar informações de mensagens anteriores
-3. Deve manter consistência com respostas anteriores
-4. Mantenha o contexto da conversa
-"""
-            return prompt_template
+            formatted_messages = []
+            for msg in messages:
+                prefix = "Usuário" if msg["role"] == "user" else "Assistente"
+                formatted_messages.append(f"{prefix}: {msg['content']}")
+            
+            # Controle de tokens
+            context = "\n".join(formatted_messages)
+            if len(context.split()) > max_tokens:
+                words = context.split()
+                context = " ".join(words[-max_tokens:])
+                logger.info(f"Contexto truncado para {max_tokens} tokens")
+            
+            logger.info(f"Contexto formatado com {len(formatted_messages)} mensagens")
+            return context
 
         except Exception as e:
             logger.error(f"Erro ao formatar conversa: {str(e)}")
+            logger.exception("Stacktrace completo:")
             return ""
 
     async def cleanup_inactive_sessions(self) -> None:
