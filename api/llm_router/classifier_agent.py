@@ -168,6 +168,12 @@ TASK_KEYWORDS = {
         "ética", "filosófica", "moral", "consciência",
         "livre arbítrio", "dilemas", "sociedade",
         "emergentes", "frameworks"
+    ],
+    "conversational": [
+        "sim", "não", "ok", "por favor", "gentileza",
+        "obrigado", "obrigada", "por gentileza", "com licença",
+        "desculpe", "perdão", "claro", "certamente", "pois não",
+        "tudo bem", "oi", "olá", "até logo", "tchau"
     ]
 }
 
@@ -302,12 +308,17 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
     # Identifica tipos de tarefa
     task_types = identify_task_type(text)
     
+    # Detecta se é uma mensagem conversacional
+    conversational_words = {"sim", "não", "ok", "por favor", "gentileza", "obrigado", "obrigada"}
+    is_conversational = any(word in text for word in conversational_words)
+    
     # Indicadores básicos
     indicators = {
         "complex": complexity == "high",
         "technical": "technical" in task_types,
         "analytical": "analysis" in task_types,
-        "simple": complexity == "low"
+        "simple": complexity == "low",
+        "conversational": is_conversational or "conversational" in task_types
     }
     
     # Log dos indicadores
@@ -332,25 +343,29 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
             "complex": 0.7,
             "technical": 0.6,
             "analytical": 0.5,
-            "simple": -0.12  # Aumentada a penalidade para mensagens simples
+            "simple": -0.12,
+            "conversational": -0.3  # Penalidade para mensagens conversacionais
         },
         "gemini": {
             "complex": 0.3,
             "technical": 0.4,
             "analytical": 0.3,
-            "simple": 0.2
+            "simple": 0.2,
+            "conversational": 0.4  # Bom para conversas naturais
         },
         "mistral": {
-            "complex": -0.8,  # Aumentada a penalidade para mensagens complexas
-            "technical": -0.3,  # Adicionada penalidade para mensagens técnicas
-            "analytical": -0.2,  # Adicionada penalidade para mensagens analíticas
-            "simple": 0.9  # Aumentada a prioridade para mensagens simples
+            "complex": -0.8,
+            "technical": -0.3,
+            "analytical": -0.2,
+            "simple": 0.9,
+            "conversational": 0.8  # Excelente para conversas simples
         },
         "gpt": {
             "complex": 0.5,
             "technical": 0.6,
             "analytical": 0.5,
-            "simple": -0.3
+            "simple": -0.3,
+            "conversational": -0.2  # Penalidade para mensagens conversacionais simples
         }
     }
     
@@ -358,11 +373,15 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
     for model in scores:
         for indicator, value in indicators.items():
             if value:
-                scores[model] += weights[model][indicator]
+                scores[model] += weights[model].get(indicator, 0)
     
-    # Garante um score mínimo positivo para o Mistral em perguntas simples
-    if indicators["simple"] and not any([indicators["complex"], indicators["technical"], indicators["analytical"]]):
-        scores["mistral"] = max(scores["mistral"], 0.7)
+    # Garante um score mínimo positivo para o Mistral em perguntas simples ou conversacionais
+    if (indicators.get("simple", False) or indicators.get("conversational", False)) and not any([
+        indicators.get("complex", False),
+        indicators.get("technical", False),
+        indicators.get("analytical", False)
+    ]):
+        scores["mistral"] = max(scores["mistral"], 0.8)
     
     # Normaliza os scores para garantir que somem 1
     total = sum(abs(score) for score in scores.values())
@@ -376,57 +395,53 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
     return scores
 
 def classify_prompt(prompt: str) -> Dict[str, Any]:
-    """Classifica o prompt com nova hierarquia de modelos."""
-    # Analisa os indicadores
+    """Classifica o prompt e escolhe o modelo mais apropriado"""
+    
+    # Análise de indicadores
     indicators = analyze_indicators(prompt)
     
-    # Calcula pontuações dos modelos
-    model_scores = calculate_model_scores(indicators)
-    
-    # Thresholds ajustados para nova hierarquia
-    thresholds = {
-        "complex": 1.5,    # Aumentado para complexidade alta
-        "technical": 1.3,  # Ajustado para questões técnicas
-        "analytical": 1.2,
-        "simple": 0.8
+    # Calcula scores dos modelos
+    model_scores = {
+        "gemini": 0.0,
+        "deepseek": 0.0,
+        "mistral": 0.0,
+        "gpt": 0.0
     }
     
-    # Determina o nível de complexidade
-    complexity_level = "high" if indicators["complex"] else \
-                      "medium" if indicators["technical"] > thresholds["technical"] else \
-                      "low" if indicators["simple"] > thresholds["simple"] else "medium"
+    # Regras de classificação
+    text = prompt.lower()
     
-    # Escolhe o modelo baseado na complexidade
-    if complexity_level == "high" and model_scores["deepseek"] > 0.6:
-        recommended_model = "deepseek"
-    elif complexity_level == "medium" and model_scores["gemini"] > 0.6:
-        recommended_model = "gemini"
-    elif complexity_level == "low" and model_scores["mistral"] > 0.6:
-        recommended_model = "mistral"
-    else:
-        # Se nenhum modelo tem confiança suficiente, escolhe o com maior score
-        recommended_model = max(model_scores.items(), key=lambda x: x[1])[0]
+    # Mistral: Bom para conversas simples e diretas
+    if len(text.split()) < 15 or "oi" in text or "olá" in text or "tudo bem" in text:
+        model_scores["mistral"] += 0.8
+        
+    # Gemini: Bom para perguntas factuais e explicações
+    if any(word in text for word in ["qual", "quem", "onde", "quando", "por que", "como"]):
+        model_scores["gemini"] += 0.8
+        
+    # DeepSeek: Bom para análises técnicas e complexas
+    if indicators["complex"] or indicators["technical"]:
+        model_scores["deepseek"] += 0.8
+        
+    # GPT: Backup para casos complexos
+    if indicators["analytical"]:
+        model_scores["gpt"] += 0.7
     
-    # Calcula confiança
-    scores_sorted = sorted(model_scores.values(), reverse=True)
-    confidence = scores_sorted[0] - scores_sorted[1] if len(scores_sorted) > 1 else 1.0
+    # Normaliza os scores
+    total = sum(model_scores.values())
+    if total > 0:
+        model_scores = {k: v/total for k, v in model_scores.items()}
+    
+    # Escolhe o modelo com maior score
+    chosen_model = max(model_scores.items(), key=lambda x: x[1])[0]
+    
+    # Calcula confiança (diferença entre o maior e segundo maior score)
+    scores = sorted(model_scores.values(), reverse=True)
+    confidence = scores[0] - scores[1] if len(scores) > 1 else 1.0
     
     return {
-        "model": recommended_model,
+        "model": chosen_model,
         "confidence": confidence,
-            "model_scores": model_scores,
-        "indicators": {
-            "complex": indicators["complex"],
-            "technical": indicators["technical"],
-            "analytical": indicators["analytical"],
-            "simple": indicators["simple"]
-        },
-        "complexity_level": complexity_level,
-        "raw_scores": model_scores,
-        "analysis": {
-            "complexity_level": complexity_level,
-            "task_nature": "unknown",
-            "key_aspects": [],
-            "explanation": "Analysis based on keywords and task type"
-        }
+        "model_scores": model_scores,
+        "indicators": indicators
     }
