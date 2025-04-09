@@ -21,9 +21,6 @@ MEGAAPI_API_KEY = os.getenv("MEGAAPI_API_KEY")
 MEGAAPI_BASE_URL = os.getenv("MEGAAPI_BASE_URL", "https://apibusiness1.megaapi.com.br")
 MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL", "https://hook.us2.make.com/hrq5lp1ahhw916uq0tdrqlr8dcmkcs64")
 
-# Cache para evitar duplicação de mensagens
-processed_messages = set()
-
 if not MEGAAPI_INSTANCE_ID or not MEGAAPI_API_KEY:
     raise ValueError("MEGAAPI_INSTANCE_ID e MEGAAPI_API_KEY precisam estar configurados")
 
@@ -155,25 +152,15 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
 
         logger.info(f"Webhook recebido: {json.dumps(payload, indent=2)}")
 
-        # Verifica se é uma mensagem do próprio bot (melhorada)
-        if (payload.get("key", {}).get("fromMe", False) or 
-            payload.get("messageType") == "message.ack" or
-            "instance_key" in payload):
-            logger.info("Mensagem enviada pelo bot ou confirmação, ignorando")
+        # Verifica se é uma mensagem do próprio bot
+        if payload.get("key", {}).get("fromMe", False):
+            logger.info("Mensagem enviada pelo bot, ignorando")
             return {"status": "ignored", "reason": "bot_message"}
 
-        # Extrai o ID da mensagem para deduplicação
-        message_id = payload.get("key", {}).get("id")
-        if message_id in processed_messages:
-            logger.info(f"Mensagem {message_id} já processada, ignorando")
-            return {"status": "ignored", "reason": "duplicate_message"}
-        
-        # Adiciona mensagem ao cache de processadas
-        if message_id:
-            processed_messages.add(message_id)
-            # Limita o tamanho do cache
-            if len(processed_messages) > 1000:
-                processed_messages.clear()
+        # Verifica se é uma mensagem de confirmação
+        if payload.get("messageType") == "message.ack":
+            logger.info("É uma mensagem de confirmação (ACK), ignorando")
+            return {"status": "ignored", "reason": "ack_message"}
 
         # Verifica se é uma mensagem válida
         if not isinstance(payload, dict):
