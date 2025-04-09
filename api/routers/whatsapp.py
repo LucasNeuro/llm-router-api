@@ -222,12 +222,16 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         try:
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
-            # Força resposta em português do Brasil
-            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial:
+            # Força resposta em português do Brasil e trata como pergunta
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial a seguinte pergunta:
 
 {message.text}
 
-Lembre-se: Sua resposta DEVE ser em português do Brasil."""
+Lembre-se:
+1. Sua resposta DEVE ser em português do Brasil
+2. Trate a mensagem como uma pergunta ou pedido de informação
+3. Seja sempre prestativo e forneça informações relevantes
+4. Use linguagem natural e amigável"""
 
             # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(
