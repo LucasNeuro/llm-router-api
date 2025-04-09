@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from .supabase import supabase
 from .logger import logger, log_memory_operation, log_memory_stats
 import json
-import uuid
 
 class ConversationManager:
     def __init__(self):
@@ -115,7 +114,6 @@ class ConversationManager:
             if not result.data:
                 # Cria novo registro se não existir
                 data = {
-                    "id": str(uuid.uuid4()),  # Adiciona ID único
                     "sender_phone": sender_phone,
                     "conversation_memory": {
                         "messages": [],
@@ -123,15 +121,9 @@ class ConversationManager:
                         "topic_changes": []
                     },
                     "last_update": current_time.isoformat(),
-                    "is_active": True,
-                    "created_at": current_time.isoformat()  # Adiciona timestamp de criação
+                    "is_active": True
                 }
-                
-                # Usa upsert para evitar conflitos
-                result = supabase.table(self.table_name)\
-                    .upsert(data)\
-                    .execute()
-                
+                result = supabase.table(self.table_name).insert(data).execute()
                 log_memory_operation("created", sender_phone)
                 return result.data[0]
             
@@ -220,24 +212,13 @@ class ConversationManager:
 
             # Recupera ou cria o registro de memória
             memory = await self._get_or_create_memory(sender_phone)
-            
-            # Garante que a estrutura da memória existe
-            if "conversation_memory" not in memory:
-                memory["conversation_memory"] = {"messages": [], "current_topic": None, "topic_changes": []}
-            
             conversation_memory = memory["conversation_memory"]
-            if "messages" not in conversation_memory:
-                conversation_memory["messages"] = []
-            
-            messages = conversation_memory["messages"]
+            messages = conversation_memory.get("messages", [])
             
             # Detecta mudança de assunto
             if role == "user" and self._detect_topic_change(messages, content):
                 # Registra a mudança de tópico
-                if "topic_changes" not in conversation_memory:
-                    conversation_memory["topic_changes"] = []
-                
-                topic_changes = conversation_memory["topic_changes"]
+                topic_changes = conversation_memory.get("topic_changes", [])
                 topic_changes.append({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "message_index": len(messages)
@@ -268,22 +249,22 @@ class ConversationManager:
                 messages = messages[-self.max_messages:]
                 log_memory_operation("truncated", sender_phone, {"new_size": len(messages)})
             
-            # Atualiza o registro no Supabase usando upsert
+            # Atualiza o registro no Supabase
             data = {
-                "id": memory.get("id", str(uuid.uuid4())),  # Usa ID existente ou cria novo
-                "sender_phone": sender_phone,
-                "conversation_memory": conversation_memory,
-                "last_update": datetime.now(timezone.utc).isoformat(),
-                "is_active": True
+                "conversation_memory": {
+                    "messages": messages,
+                    "current_topic": conversation_memory.get("current_topic"),
+                    "topic_changes": conversation_memory.get("topic_changes", [])
+                },
+                "last_update": datetime.now(timezone.utc).isoformat()
             }
             
-            # Usa upsert para garantir a criação/atualização
-            result = supabase.table(self.table_name)\
-                .upsert(data)\
+            supabase.table(self.table_name)\
+                .update(data)\
+                .eq("sender_phone", sender_phone)\
                 .execute()
             
             log_memory_stats(sender_phone, len(messages), True)
-            logger.info(f"Mensagem adicionada com sucesso para {sender_phone}")
 
         except Exception as e:
             logger.error(f"Erro ao adicionar mensagem: {str(e)}")
