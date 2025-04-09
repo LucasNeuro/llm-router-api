@@ -339,25 +339,29 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
             "complex": 0.7,
             "technical": 0.6,
             "analytical": 0.5,
-            "simple": -0.12  # Aumentada a penalidade para mensagens simples
+            "simple": -0.12,
+            "is_question": 0.3
         },
         "gemini": {
             "complex": 0.3,
             "technical": 0.4,
-            "analytical": 0.3,
-            "simple": 0.2
+            "analytical": 0.2,
+            "simple": 0.1,
+            "is_question": 0.5
         },
         "mistral": {
-            "complex": -0.8,  # Aumentada a penalidade para mensagens complexas
-            "technical": -0.3,  # Adicionada penalidade para mensagens técnicas
-            "analytical": -0.2,  # Adicionada penalidade para mensagens analíticas
-            "simple": 0.9  # Aumentada a prioridade para mensagens simples
+            "complex": 0.2,
+            "technical": 0.3,
+            "analytical": 0.4,
+            "simple": 0.2,
+            "is_question": 0.4
         },
         "gpt": {
-            "complex": 0.5,
-            "technical": 0.6,
-            "analytical": 0.5,
-            "simple": -0.3
+            "complex": 0.8,
+            "technical": 0.7,
+            "analytical": 0.6,
+            "simple": 0.0,
+            "is_question": 0.6
         }
     }
     
