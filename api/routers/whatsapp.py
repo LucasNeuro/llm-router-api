@@ -195,18 +195,13 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             if phone.startswith("55"):
                 phone = phone[2:]
                 
-            # Corrige a extração do timestamp
-            timestamp = payload.get("messageTimestamp", 0)
-            if isinstance(timestamp, dict):
-                timestamp = timestamp.get('low', 0)  # Ajusta para pegar o valor correto
-
             message = WhatsAppMessage(
                 messageType=payload.get("messageType", "text"),
                 text=message_text,
                 phone=phone,
                 instanceId=payload.get("instance_key", ""),
                 messageId=payload.get("key", {}).get("id", ""),
-                timestamp=timestamp
+                timestamp=payload.get("messageTimestamp", 0)
             )
             
             # Log do número do remetente
@@ -227,9 +222,16 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         try:
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
-            # Garante que o LLMRouter processe corretamente
+            # Força resposta em português do Brasil
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial:
+
+{message.text}
+
+Lembre-se: Sua resposta DEVE ser em português do Brasil."""
+
+            # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(
-                prompt=message_text,  # Usa o texto original
+                prompt=prompt_ptbr,
                 sender_phone=message.phone
             )
             
@@ -247,7 +249,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             request_id = str(uuid.uuid4())
 
             # Analisa custos
-            cost_analysis = analyze_cost(result["model"], message_text, result["text"])
+            cost_analysis = analyze_cost(result["model"], prompt_ptbr, result["text"])
 
             # Salva dados no Supabase
             await save_llm_data(
