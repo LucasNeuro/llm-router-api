@@ -155,10 +155,11 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
 
         logger.info(f"Webhook recebido: {json.dumps(payload, indent=2)}")
 
-        # Verifica se é uma mensagem do próprio bot ou confirmação
-        if (payload.get("messageType") == "message.ack" or
-            (payload.get("key", {}).get("fromMe", False) and "instance_key" in payload)):
-            logger.info("Mensagem de confirmação ou do bot, ignorando")
+        # Verifica se é uma mensagem do próprio bot (melhorada)
+        if (payload.get("key", {}).get("fromMe", False) or 
+            payload.get("messageType") == "message.ack" or
+            "instance_key" in payload):
+            logger.info("Mensagem enviada pelo bot ou confirmação, ignorando")
             return {"status": "ignored", "reason": "bot_message"}
 
         # Extrai o ID da mensagem para deduplicação
@@ -254,16 +255,14 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
                 clean_text = clean_text.split("Lembre-se:")[0].strip()
             
             # Força resposta em português do Brasil e trata como pergunta
-            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e profissional a seguinte mensagem:
+            prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial a seguinte mensagem:
 
-                            {clean_text}
+{clean_text}
 
-                            Instruções:
-                            1. Use linguagem natural e amigável, mas profissional
-                            2. Seja direto e objetivo nas respostas
-                            3. Mantenha um tom cordial e prestativo
-                            4. Use português brasileiro coloquial, mas sem gírias excessivas
-                            5. Evite personagens fictícios ou personas específicas"""
+Lembre-se:
+1. Mantenha o tom natural e amigável
+2. Seja prestativo e forneça informações relevantes
+3. Use linguagem coloquial do Brasil"""
 
             # Usa o LLM Router com contexto da conversa
             result = await llm_router.route_prompt(
