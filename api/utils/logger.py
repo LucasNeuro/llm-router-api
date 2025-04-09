@@ -35,6 +35,18 @@ def log_error(error: Exception, context: str = None):
     """Log formatado para erros"""
     logger.error(f"Error {f'in {context} ' if context else ''}- {str(error)}")
 
+def log_memory_operation(operation: str, phone: str, details: dict = None):
+    """Log formatado para operações de memória"""
+    log_msg = f"Memory {operation} for {phone}"
+    if details:
+        log_msg += f" - Details: {json.dumps(details, ensure_ascii=False)}"
+    logger.info(log_msg)
+
+def log_memory_stats(phone: str, total_messages: int, active: bool):
+    """Log formatado para estatísticas de memória"""
+    status = "active" if active else "inactive"
+    logger.info(f"Memory stats for {phone}: {total_messages} messages, status: {status}")
+
 # Exemplo de uso:
 if __name__ == "__main__":
     logger.info("Teste de log info")

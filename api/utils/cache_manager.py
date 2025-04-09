@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 from .supabase import supabase
 import re
+import uuid
 
 class CacheManager:
     """Gerenciador de cache usando Supabase"""
@@ -47,44 +48,62 @@ class CacheManager:
     async def get_cached_response(prompt: str) -> Optional[Dict[str, Any]]:
         """Busca uma resposta no cache"""
         try:
-            # Primeiro tenta encontrar match exato
-            prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
-            response = supabase.table('response_cache').select('*').eq('prompt_hash', prompt_hash).execute()
+            # Normaliza o prompt e gera o hash
+            normalized_prompt = CacheManager._normalize_prompt(prompt)
+            prompt_hash = hashlib.sha256(normalized_prompt.encode()).hexdigest()
             
-            if not (response and response.data and len(response.data) > 0):
-                # Se não encontrou match exato, busca todas as entradas não expiradas
-                response = supabase.table('response_cache').select('*').gt('expires_at', datetime.utcnow().isoformat()).execute()
-                
-                if response and response.data:
-                    # Procura por prompts similares
-                    best_match = None
-                    best_similarity = 0.0
-                    
-                    for entry in response.data:
-                        similarity = CacheManager._calculate_similarity(prompt, entry['prompt'])
-                        if similarity > 0.8 and similarity > best_similarity:  # 80% de similaridade mínima
-                            best_similarity = similarity
-                            best_match = entry
-                    
-                    if best_match:
-                        logger.info(f"Cache hit (similaridade: {best_similarity:.2%}) para prompt: {best_match['prompt']}")
-                        cached_data = best_match
-                    else:
-                        return None
-                else:
-                    return None
-            else:
+            # Busca por match exato primeiro
+            response = supabase.table('response_cache')\
+                .select('*')\
+                .eq('prompt_hash', prompt_hash)\
+                .gt('expires_at', datetime.utcnow().isoformat())\
+                .execute()
+            
+            if response and response.data and len(response.data) > 0:
                 logger.info(f"Cache hit exato para prompt_hash: {prompt_hash}")
                 cached_data = response.data[0]
+                best_similarity = 1.0
+            else:
+                # Se não encontrou match exato, busca por similaridade
+                response = supabase.table('response_cache')\
+                    .select('*')\
+                    .gt('expires_at', datetime.utcnow().isoformat())\
+                    .execute()
+                
+                if not (response and response.data):
+                    logger.info("Nenhuma entrada válida no cache")
+                    return None
+                
+                # Procura por prompts similares
+                best_match = None
+                best_similarity = 0.0
+                
+                for entry in response.data:
+                    similarity = CacheManager._calculate_similarity(prompt, entry['prompt'])
+                    if similarity > 0.8 and similarity > best_similarity:  # 80% de similaridade mínima
+                        best_similarity = similarity
+                        best_match = entry
+                
+                if not best_match:
+                    logger.info("Nenhum match similar encontrado no cache")
+                    return None
+                    
+                logger.info(f"Cache hit por similaridade ({best_similarity:.2%}) para prompt: {best_match['prompt']}")
+                cached_data = best_match
             
-            # Atualiza hit_count e last_accessed
-            supabase.table('response_cache').update({
-                'hit_count': cached_data['hit_count'] + 1,
-                'last_accessed': datetime.utcnow().isoformat()
-            }).eq('id', cached_data['id']).execute()
-            
-            # Processa a resposta do cache
             try:
+                # Atualiza hit_count e last_accessed
+                update_data = {
+                    'hit_count': cached_data['hit_count'] + 1,
+                    'last_accessed': datetime.utcnow().isoformat()
+                }
+                
+                supabase.table('response_cache')\
+                    .update(update_data)\
+                    .eq('id', cached_data['id'])\
+                    .execute()
+                
+                # Processa a resposta do cache
                 cached_response = cached_data['response']
                 if isinstance(cached_response, str):
                     cached_response = json.loads(cached_response)
@@ -94,17 +113,20 @@ class CacheManager:
                     "model": cached_data['model'],
                     "success": True,
                     "from_cache": True,
-                    "confidence": 1.0,
-                    "model_scores": None,
-                    "indicators": None,
-                    "cache_similarity": best_similarity if 'best_similarity' in locals() else 1.0
+                    "confidence": cached_response.get("confidence", 1.0),
+                    "model_scores": cached_response.get("model_scores"),
+                    "indicators": cached_response.get("indicators"),
+                    "cache_similarity": best_similarity
                 }
+                
             except Exception as e:
                 logger.error(f"Erro ao processar resposta do cache: {str(e)}")
+                logger.exception("Stacktrace completo:")
                 return None
                 
         except Exception as e:
             logger.error(f"Erro ao buscar cache: {str(e)}")
+            logger.exception("Stacktrace completo:")
             return None
 
     @staticmethod
@@ -116,33 +138,63 @@ class CacheManager:
     ) -> bool:
         """Salva uma resposta no cache"""
         try:
-            prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
+            # Normaliza o prompt e gera o hash
+            normalized_prompt = CacheManager._normalize_prompt(prompt)
+            prompt_hash = hashlib.sha256(normalized_prompt.encode()).hexdigest()
             expires_at = (datetime.utcnow() + timedelta(hours=ttl_hours)).isoformat()
             
             # Prepara a resposta para cache
             response_to_cache = {
                 "text": response.get("text", ""),
                 "model": model,
-                "success": response.get("success", True)
+                "success": response.get("success", True),
+                "confidence": response.get("confidence", 1.0),
+                "model_scores": response.get("model_scores", {}),
+                "indicators": response.get("indicators", {})
             }
             
-            # Insere ou atualiza o cache
-            data = {
-                'prompt_hash': prompt_hash,
-                'prompt': prompt,
-                'response': response_to_cache,  # Supabase já lida com JSON
-                'model': model,
-                'expires_at': expires_at,
-                'last_accessed': datetime.utcnow().isoformat(),
-                'hit_count': 1
-            }
+            # Verifica se já existe no cache
+            existing = supabase.table("response_cache")\
+                .select("*")\
+                .eq("prompt_hash", prompt_hash)\
+                .execute()
             
-            supabase.table('response_cache').upsert(data).execute()
-            logger.info(f"Resposta cacheada com sucesso: {prompt_hash}")
+            if existing and existing.data:
+                # Atualiza entrada existente
+                data = {
+                    "response": response_to_cache,
+                    "last_accessed": datetime.utcnow().isoformat(),
+                    "hit_count": existing.data[0].get("hit_count", 0) + 1
+                }
+                
+                result = supabase.table("response_cache")\
+                    .update(data)\
+                    .eq("prompt_hash", prompt_hash)\
+                    .execute()
+            else:
+                # Cria nova entrada
+                data = {
+                    "id": str(uuid.uuid4()),
+                    "prompt_hash": prompt_hash,
+                    "prompt": prompt,
+                    "response": response_to_cache,
+                    "model": model,
+                    "expires_at": expires_at,
+                    "last_accessed": datetime.utcnow().isoformat(),
+                    "hit_count": 1,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+                
+                result = supabase.table("response_cache")\
+                    .insert(data)\
+                    .execute()
+            
+            logger.info(f"Cache {'atualizado' if existing and existing.data else 'criado'} com sucesso para hash: {prompt_hash}")
             return True
             
         except Exception as e:
             logger.error(f"Erro ao salvar cache: {str(e)}")
+            logger.exception("Stacktrace completo:")
             return False
 
     @staticmethod
