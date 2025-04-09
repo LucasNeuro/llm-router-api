@@ -88,10 +88,17 @@ class LLMRouter:
                 
                 # Recupera contexto da conversa
                 context = await conversation_manager.format_conversation_for_llm(sender_phone)
-                full_prompt = f"{context}\n\nNova mensagem: {prompt}"
+                if context:
+                    full_prompt = f"""
+{context}
+
+Nova pergunta do usuário: {prompt}
+
+Responda usando o contexto acima quando relevante. Mantenha o tom natural e amigável em português do Brasil."""
+                else:
+                    full_prompt = prompt
                 logger.info(f"Prompt com contexto: {full_prompt}")
             else:
-                logger.info("Sem sender_phone, usando prompt sem contexto")
                 full_prompt = prompt
 
             # Se um modelo específico foi solicitado, use-o

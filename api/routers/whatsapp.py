@@ -195,13 +195,20 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             if phone.startswith("55"):
                 phone = phone[2:]
                 
+            # Processa o timestamp corretamente
+            timestamp = payload.get("messageTimestamp")
+            if isinstance(timestamp, dict) and "low" in timestamp:
+                timestamp = timestamp["low"]
+            elif not isinstance(timestamp, int):
+                timestamp = int(time.time())
+            
             message = WhatsAppMessage(
                 messageType=payload.get("messageType", "text"),
                 text=message_text,
                 phone=phone,
                 instanceId=payload.get("instance_key", ""),
                 messageId=payload.get("key", {}).get("id", ""),
-                timestamp=payload.get("messageTimestamp", 0)
+                timestamp=timestamp
             )
             
             # Log do número do remetente

@@ -296,10 +296,7 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
     # Converte para minúsculas para análise
     text = prompt.lower()
     
-    # Trata qualquer texto como uma pergunta/pedido de informação
-    is_question = True
-    
-    # Detecta complexidade
+    # Análise de complexidade
     complexity = analyze_complexity(text)
     
     # Identifica tipos de tarefa
@@ -307,14 +304,10 @@ def analyze_indicators(prompt: str) -> Dict[str, Any]:
     
     # Indicadores básicos
     indicators = {
-        "is_question": is_question,
-        "is_complex": complexity == "high",
-        "is_technical": "technical" in task_types,
-        "is_analytical": "analysis" in task_types,
-        "is_creative": "creative" in task_types,
-        "is_factual": "factual" in task_types,
-        "needs_context": len(text.split()) > 10,  # Se tem mais de 10 palavras
-        "is_conversational": True  # Sempre trata como conversacional
+        "complex": complexity == "high",
+        "technical": "technical" in task_types,
+        "analytical": "analysis" in task_types,
+        "simple": complexity == "low"
     }
     
     # Log dos indicadores
