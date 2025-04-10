@@ -5,6 +5,7 @@ from .supabase import supabase
 from .logger import logger, log_memory_operation, log_memory_stats
 import json
 import re
+from ..llm_router.mistral import call_mistral
 
 class ConversationManager:
     def __init__(self):
@@ -13,16 +14,6 @@ class ConversationManager:
         self.inactive_hours = 24  # Tempo para inatividade
         self.context_window = 10  # Número de mensagens mantidas ao mudar de assunto
         self.use_ai_topic_detection = True  # Usa IA para detecção de tópicos
-        self._llm_callable = None  # Será configurado dinamicamente
-        
-    # Método para configurar a função do LLM a ser usada
-    def set_llm_callable(self, llm_func):
-        """
-        Define a função de LLM a ser utilizada para detecção de tópicos
-        Isso evita a dependência circular
-        """
-        self._llm_callable = llm_func
-        logger.info("Função de LLM configurada para detecção de tópicos")
         
     async def _get_memory_status(self, sender_phone: str) -> bool:
         """Verifica se a memória está ativa para o número"""
@@ -231,15 +222,6 @@ class ConversationManager:
     async def _detect_topic_change_with_ai(self, current_messages: List[Dict], new_message: str) -> Dict[str, Any]:
         """Usa IA (Mistral) para detectar mudanças de tópico e extrair o novo tema"""
         try:
-            # Se a função de LLM não estiver configurada, usa o método baseado em regras
-            if self._llm_callable is None:
-                logger.warning("Função de LLM não configurada, usando método baseado em regras")
-                return {
-                    "is_topic_change": self._detect_topic_change(current_messages, new_message),
-                    "new_topic": self._extract_topic(new_message),
-                    "confidence": 0.3
-                }
-
             # Se não tiver mensagens anteriores, não é mudança de tópico
             if not current_messages:
                 return {
@@ -278,61 +260,18 @@ Exemplos para guiar sua classificação:
 
 Responda apenas com o JSON:"""
 
-            # Chama o LLM configurado para análise
-            result = await self._llm_callable(prompt)
+            # Chama o Mistral para análise
+            result = await call_mistral(prompt)
             
             try:
                 # Tenta extrair o JSON da resposta
                 if isinstance(result, str):
                     # Remove possíveis textos antes ou depois do JSON
                     json_str = result.strip()
-                    
-                    # Se estiver no formato de resposta do modelo (dicionário com 'text')
-                    if isinstance(result, dict) and 'text' in result:
-                        json_str = result['text'].strip()
-                    
-                    # Remove marcadores de código markdown se presentes
-                    if "```json" in json_str:
-                        parts = json_str.split("```json")
-                        if len(parts) > 1:
-                            json_str = parts[1].split("```")[0].strip()
-                    elif "```" in json_str:
-                        # Extrai conteúdo de qualquer bloco de código
-                        code_blocks = json_str.split("```")
-                        if len(code_blocks) >= 3:  # Formato esperado: texto, código, texto
-                            json_str = code_blocks[1].strip()
-                    
                     # Se houver texto explicativo antes ou depois do JSON, tenta extrair só o JSON
                     if json_str.find('{') >= 0 and json_str.rfind('}') > json_str.find('{'):
                         json_str = json_str[json_str.find('{'):json_str.rfind('}')+1]
                     
-                    logger.info(f"JSON extraído para parsing: {json_str}")
-                    
-                    # Tenta analisar o JSON
-                    analysis = json.loads(json_str)
-                elif isinstance(result, dict) and 'text' in result:
-                    # Se for dicionário com resposta do modelo
-                    text_content = result['text'].strip()
-                    
-                    # Remove marcadores de código markdown
-                    if "```json" in text_content:
-                        parts = text_content.split("```json")
-                        if len(parts) > 1:
-                            json_str = parts[1].split("```")[0].strip()
-                    elif "```" in text_content:
-                        code_blocks = text_content.split("```")
-                        if len(code_blocks) >= 3:
-                            json_str = code_blocks[1].strip()
-                    else:
-                        json_str = text_content
-                    
-                    # Extrai apenas o JSON
-                    if json_str.find('{') >= 0 and json_str.rfind('}') > json_str.find('{'):
-                        json_str = json_str[json_str.find('{'):json_str.rfind('}')+1]
-                    
-                    logger.info(f"JSON extraído para parsing (de text): {json_str}")
-                    
-                    # Analisa o JSON
                     analysis = json.loads(json_str)
                 else:
                     # Se já for um dicionário
@@ -345,27 +284,17 @@ Responda apenas com o JSON:"""
                     analysis["new_topic"] = self._extract_topic(new_message)
                 if "confidence" not in analysis:
                     analysis["confidence"] = 0.5
-                
-                # Converte valores para garantir tipos corretos
-                analysis["is_topic_change"] = bool(analysis["is_topic_change"])
-                if isinstance(analysis["confidence"], str):
-                    try:
-                        analysis["confidence"] = float(analysis["confidence"])
-                    except ValueError:
-                        analysis["confidence"] = 0.5
-                
-                # Log detalhado da análise
+                    
                 log_memory_operation("ai_topic_detection", "system", {
                     "is_change": analysis["is_topic_change"],
                     "new_topic": analysis["new_topic"],
-                    "confidence": analysis["confidence"],
-                    "raw_response": str(result)[:100] + "..." if len(str(result)) > 100 else str(result)
+                    "confidence": analysis["confidence"]
                 })
                 
                 return analysis
                 
             except json.JSONDecodeError:
-                logger.error(f"Erro ao decodificar JSON da resposta do LLM: {result}")
+                logger.error(f"Erro ao decodificar JSON da resposta do Mistral: {result}")
                 # Fallback para detecção baseada em regras
                 return {
                     "is_topic_change": self._detect_topic_change(current_messages, new_message),
@@ -643,5 +572,4 @@ Responda apenas com o JSON:"""
             logger.exception("Stacktrace completo:")
 
 # Instância global do gerenciador de conversas
-# Agora só criamos a instância, a configuração do LLM será feita quando o router for inicializado
 conversation_manager = ConversationManager()

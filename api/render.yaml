@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: g4-telecom-whatsapp-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: GPT_API_KEY
+        sync: false
+      - key: MEGAAPI_INSTANCE_ID
+        sync: false
+      - key: MEGAAPI_API_KEY
+        sync: false
+      - key: MEGAAPI_BASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: MAKE_WEBHOOK_URL
+        sync: false 

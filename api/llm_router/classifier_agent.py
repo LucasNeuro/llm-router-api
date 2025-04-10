@@ -377,31 +377,31 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
         "gpt": 0.0
     }
     
-    # Pesos para cada modelo
+    # Pesos ajustados para o contexto do agente da G4 Telecom
     weights = {
         "deepseek": {
-            "complex": 0.7,
-            "technical": 0.6,
-            "analytical": 0.5,
-            "simple": -0.12  # Aumentada a penalidade para mensagens simples
+            "complex": 0.8,      # Aumentado para questões técnicas complexas
+            "technical": 0.7,    # Aumentado para suporte técnico
+            "analytical": 0.6,   # Mantido para análises
+            "simple": -0.1       # Reduzido para não usar em perguntas simples
         },
         "gemini": {
-            "complex": 0.3,
-            "technical": 0.4,
-            "analytical": 0.3,
-            "simple": 0.2
+            "complex": 0.5,      # Bom para questões comerciais complexas
+            "technical": 0.6,    # Bom para explicações técnicas
+            "analytical": 0.5,   # Bom para análises de planos
+            "simple": 0.4        # Bom para respostas simples e diretas
         },
         "mistral": {
-            "complex": -0.8,  # Aumentada a penalidade para mensagens complexas
-            "technical": -0.3,  # Adicionada penalidade para mensagens técnicas
-            "analytical": -0.2,  # Adicionada penalidade para mensagens analíticas
-            "simple": 0.9  # Aumentada a prioridade para mensagens simples
+            "complex": -0.3,     # Reduzido para não usar em questões complexas
+            "technical": -0.2,   # Reduzido para não usar em questões técnicas
+            "analytical": -0.1,  # Reduzido para não usar em análises
+            "simple": 0.9        # Excelente para conversas simples e amigáveis
         },
         "gpt": {
-            "complex": 0.5,
-            "technical": 0.6,
-            "analytical": 0.5,
-            "simple": -0.3
+            "complex": 0.7,      # Bom para questões complexas
+            "technical": 0.8,    # Excelente para suporte técnico
+            "analytical": 0.7,   # Bom para análises
+            "simple": 0.3        # Aceitável para respostas simples
         }
     }
     
@@ -411,9 +411,21 @@ def calculate_model_scores(indicators: Dict[str, Any]) -> Dict[str, float]:
             if value:
                 scores[model] += weights[model][indicator]
     
-    # Garante um score mínimo positivo para o Mistral em perguntas simples
-    if indicators["simple"] and not any([indicators["complex"], indicators["technical"], indicators["analytical"]]):
-        scores["mistral"] = max(scores["mistral"], 0.7)
+    # Ajustes específicos para o contexto da G4 Telecom
+    # Prioriza Mistral para perguntas sobre planos e preços
+    if any(word in prompt.lower() for word in ["plano", "preço", "valor", "custo", "pacote"]):
+        scores["mistral"] += 0.3
+        scores["gemini"] += 0.2
+    
+    # Prioriza DeepSeek para questões técnicas
+    if any(word in prompt.lower() for word in ["internet", "velocidade", "conexão", "wi-fi", "roteador"]):
+        scores["deepseek"] += 0.3
+        scores["gpt"] += 0.2
+    
+    # Prioriza Gemini para questões comerciais
+    if any(word in prompt.lower() for word in ["contrato", "assinatura", "instalação", "mudança", "cancelamento"]):
+        scores["gemini"] += 0.3
+        scores["gpt"] += 0.2
     
     # Normaliza os scores para garantir que somem 1
     total = sum(abs(score) for score in scores.values())
@@ -434,12 +446,12 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
     # Calcula pontuações dos modelos
     model_scores = calculate_model_scores(indicators)
     
-    # Thresholds ajustados para nova hierarquia
+    # Thresholds ajustados para o contexto da G4 Telecom
     thresholds = {
-        "complex": 1.5,    # Aumentado para complexidade alta
-        "technical": 1.3,  # Ajustado para questões técnicas
-        "analytical": 1.2,
-        "simple": 0.8
+        "complex": 1.6,    # Aumentado para questões técnicas complexas
+        "technical": 1.4,  # Ajustado para suporte técnico
+        "analytical": 1.3, # Mantido para análises
+        "simple": 0.7      # Reduzido para facilitar uso do Mistral
     }
     
     # Determina o nível de complexidade
@@ -447,12 +459,12 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
                       "medium" if indicators["technical"] > thresholds["technical"] else \
                       "low" if indicators["simple"] > thresholds["simple"] else "medium"
     
-    # Escolhe o modelo baseado na complexidade
+    # Escolhe o modelo baseado na complexidade e contexto
     if complexity_level == "high" and model_scores["deepseek"] > 0.6:
         recommended_model = "deepseek"
-    elif complexity_level == "medium" and model_scores["gemini"] > 0.6:
+    elif complexity_level == "medium" and model_scores["gemini"] > 0.5:
         recommended_model = "gemini"
-    elif complexity_level == "low" and model_scores["mistral"] > 0.6:
+    elif complexity_level == "low" and model_scores["mistral"] > 0.5:
         recommended_model = "mistral"
     else:
         # Se nenhum modelo tem confiança suficiente, escolhe o com maior score
@@ -465,7 +477,7 @@ def classify_prompt(prompt: str) -> Dict[str, Any]:
     return {
         "model": recommended_model,
         "confidence": confidence,
-            "model_scores": model_scores,
+        "model_scores": model_scores,
         "indicators": {
             "complex": indicators["complex"],
             "technical": indicators["technical"],
