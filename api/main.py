@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
-from api.routers import chat, health, whatsapp, agent_whatsapp
+from api.routers import chat, health, whatsapp
 from api.utils.logger import logger
 from api.utils.cache_manager import cache_manager
 
@@ -49,9 +49,6 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 
 # Router do WhatsApp sem prefixo para compatibilidade com MegaAPI
 app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
-
-# Router dos agentes
-app.include_router(agent_whatsapp.router, prefix="/api/v1", tags=["agents"])
 
 @app.on_event("startup")
 async def startup_event():
