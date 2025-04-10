@@ -124,20 +124,13 @@ class AgentService:
             # Envia o prompt para o LLM Router
             result = await self.llm_router.route_prompt(
                 prompt=prompt,
-                sender_phone=sender_phone,
-                use_cache=True  # Habilita o cache para respostas similares
+                sender_phone=sender_phone
             )
             
             # Adiciona metadados do agente à resposta
             result["agent_id"] = agent_id
             result["agent_name"] = agent.config.name
             result["need_human"] = False
-            
-            # Log da escolha do modelo
-            logger.info(f"Modelo escolhido para resposta: {result.get('model', 'unknown')}")
-            logger.info(f"Confiança da escolha: {result.get('confidence', 0.0)}")
-            if result.get('model_scores'):
-                logger.info(f"Scores dos modelos: {result.get('model_scores')}")
             
             return result
             
