@@ -65,15 +65,6 @@ class LLMRouter:
                             model_used=cached_response["model"],
                             save_to_db=True
                         )
-                    
-                    # Adiciona cost_analysis zerado para respostas do cache
-                    cached_response["cost_analysis"] = {
-                        "tokens": {"prompt": 0, "completion": 0, "total": 0},
-                        "costs": {
-                            "usd": {"dollars": 0, "cents": 0},
-                            "brl": {"dollars": 0, "cents": 0}
-                        }
-                    }
                     return cached_response
 
             # Adiciona mensagem do usuário à memória

@@ -86,10 +86,8 @@ async def chat_endpoint(request: ChatRequest):
                 model_used=result["model"]
             )
 
-        # Analisa custos apenas se não for do cache
-        cost_analysis = result.get("cost_analysis")
-        if not result.get("from_cache"):
-            cost_analysis = analyze_cost(result["model"], request.prompt, result["text"])
+        # Analisa custos
+        cost_analysis = analyze_cost(result["model"], request.prompt, result["text"])
         
         # Salva dados no Supabase
         await save_llm_data(
@@ -97,7 +95,7 @@ async def chat_endpoint(request: ChatRequest):
             response=result["text"],
             model=result["model"],
             success=result["success"],
-            confidence=result.get("confidence", 1.0),
+            confidence=result.get("confidence"),
             scores=result.get("model_scores", {}),
             indicators=result.get("indicators", {}),
             cost_analysis=cost_analysis,

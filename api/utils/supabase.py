@@ -43,16 +43,6 @@ async def save_llm_data(
     Salva os dados da requisição LLM no Supabase
     """
     try:
-        # Valores padrão para cost_analysis
-        if cost_analysis is None:
-            cost_analysis = {
-                "tokens": {"prompt": 0, "completion": 0, "total": 0},
-                "costs": {
-                    "usd": {"dollars": 0, "cents": 0},
-                    "brl": {"dollars": 0, "cents": 0}
-                }
-            }
-
         # Extrai informações de custo e tokens
         tokens = cost_analysis.get("tokens", {})
         costs = cost_analysis.get("costs", {})

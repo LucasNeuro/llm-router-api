@@ -40,13 +40,8 @@ async def send_whatsapp_message(phone: str, message: str):
         # Formata o número do telefone
         if not phone.startswith("55"):
             phone = f"55{phone}"
-        
-        # Garante que a URL base tem o protocolo correto
-        base_url = MEGAAPI_BASE_URL
-        if not base_url.startswith(("http://", "https://")):
-            base_url = f"https://{base_url}"
             
-        url = f"{base_url}/rest/sendMessage/megabusiness-MoYuzQehcPQ/text"
+        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/megabusiness-MoYuzQehcPQ/text"
         headers = {
             "accept": "*/*",
             "Content-Type": "application/json",
@@ -176,37 +171,14 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         message_text = None
         message_data = payload.get("message", {})
         
-        # Tenta extrair a mensagem de diferentes formatos possíveis
         if isinstance(message_data, dict):
-            # Formato padrão da MegaAPI
             if "extendedTextMessage" in message_data:
                 message_text = message_data["extendedTextMessage"].get("text", "")
             elif "conversation" in message_data:
                 message_text = message_data["conversation"]
             elif "text" in message_data:
-                if isinstance(message_data["text"], dict):
-                    message_text = message_data["text"].get("message", "")
-                else:
-                    message_text = message_data["text"]
-            # Verifica formato alternativo
-            elif "body" in message_data:
-                message_text = message_data["body"]
-        # Formato alternativo onde a mensagem está diretamente no payload
-        elif "text" in payload:
-            message_text = payload["text"]
-        elif "body" in payload:
-            message_text = payload["body"]
-        
-        # Se ainda não encontrou, tenta procurar em qualquer lugar no payload
-        if not message_text:
-            logger.info("Tentando encontrar mensagem em estrutura diferente do esperado")
-            if isinstance(payload, dict):
-                for key, value in payload.items():
-                    if isinstance(value, str) and len(value) > 0 and len(value) < 500:
-                        logger.info(f"Possível mensagem encontrada em campo '{key}': {value}")
-                        if not message_text:  # Só atribui se ainda não tiver encontrado
-                            message_text = value
-        
+                message_text = message_data["text"].get("message", "")
+
         # Se não houver mensagem de texto, ignora
         if not message_text:
             logger.info(f"Mensagem sem texto extraível: {json.dumps(message_data, indent=2)}")
@@ -217,42 +189,10 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
 
         # Extrai informações da mensagem
         try:
-            # Tenta extrair o número do remetente de diferentes lugares
-            phone = None
-            
-            # Formato padrão - do remoteJid
-            if "key" in payload and "remoteJid" in payload["key"]:
-                remote_jid = payload["key"]["remoteJid"]
-                if "@" in remote_jid:
-                    phone = remote_jid.split("@")[0]
-            
-            # Formato alternativo - diretamente no campo 'from'
-            if not phone and "from" in payload:
-                phone = payload["from"]
-                # Remove @c.us ou @s.whatsapp.net se existir
-                if phone and "@" in phone:
-                    phone = phone.split("@")[0]
-            
-            # Formato alternativo - no campo sender
-            if not phone and "sender" in payload:
-                phone = payload["sender"]
-            
-            # Se ainda não encontrou, procura em qualquer lugar no payload
-            if not phone:
-                if isinstance(payload, dict):
-                    for key in ["phone", "sender_id", "customer", "number"]:
-                        if key in payload and isinstance(payload[key], str):
-                            phone = payload[key]
-                            break
-                            
-            if not phone:
-                logger.error("Não foi possível extrair o número do telefone")
-                return {"status": "error", "reason": "no_phone_number"}
-                
-            # Limpa o número de telefone
-            phone = str(phone).replace("+", "")
+            # Extrai o número do remetente do remoteJid
+            phone = payload.get("key", {}).get("remoteJid", "").split("@")[0]
             # Remove o prefixo "55" se existir
-            if phone.startswith("55") and len(phone) > 10:
+            if phone.startswith("55"):
                 phone = phone[2:]
                 
             message = WhatsAppMessage(
@@ -362,16 +302,10 @@ async def whatsapp_status():
     Verifica status da conexão com WhatsApp
     """
     try:
-        # Garante que a URL base tem o protocolo correto
-        base_url = MEGAAPI_BASE_URL
-        if not base_url.startswith(("http://", "https://")):
-            base_url = f"https://{base_url}"
-            
-        url = f"{base_url}/rest/instance/status"
+        url = f"{MEGAAPI_BASE_URL}/rest/instance/status"
         headers = {
             "accept": "*/*",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
+            "Content-Type": "application/json"
         }
         params = {
             "instanceId": "megabusiness-MoYuzQehcPQ"
