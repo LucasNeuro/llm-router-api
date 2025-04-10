@@ -20,6 +20,10 @@ class LLMRouter:
             "gemini": call_gemini
         }
         
+        # Configura o callable do Mistral no gerenciador de conversas para detecção de tópicos
+        conversation_manager.set_llm_callable(call_mistral)
+        logger.info("LLM Router inicializado e callable configurado no ConversationManager")
+        
     async def route_prompt(
         self,
         prompt: str,
