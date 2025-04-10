@@ -134,97 +134,6 @@ async def cleanup_sessions(background_tasks: BackgroundTasks):
     """Tarefa em background para limpar sessões inativas"""
     await conversation_manager.cleanup_inactive_sessions()
 
-async def send_typing_indicator(phone: str, duration: int = 3):
-    """
-    Envia indicador de digitação via MegaAPI
-    """
-    try:
-        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/megabusiness-MoYuzQehcPQ/typing"
-        headers = {
-            "accept": "*/*",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
-        }
-        payload = {
-            "messageData": {
-                "to": phone,
-                "duration": duration
-            }
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            return response.json()
-            
-    except Exception as e:
-        logger.error(f"Erro ao enviar indicador de digitação: {str(e)}")
-        return None
-
-async def send_interactive_message(phone: str, message_type: str, content: dict):
-    """
-    Envia mensagem interativa via MegaAPI
-    """
-    try:
-        url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/megabusiness-MoYuzQehcPQ/{message_type}"
-        headers = {
-            "accept": "*/*",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
-        }
-        payload = {
-            "messageData": {
-                "to": phone,
-                **content
-            }
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            return response.json()
-            
-    except Exception as e:
-        logger.error(f"Erro ao enviar mensagem interativa: {str(e)}")
-        return None
-
-async def send_button_message(phone: str, text: str, buttons: list):
-    """
-    Envia mensagem com botões via MegaAPI
-    """
-    return await send_interactive_message(phone, "button", {
-        "text": text,
-        "buttons": buttons
-    })
-
-async def send_list_message(phone: str, text: str, sections: list):
-    """
-    Envia mensagem com lista via MegaAPI
-    """
-    return await send_interactive_message(phone, "list", {
-        "text": text,
-        "sections": sections
-    })
-
-async def send_image_message(phone: str, image_url: str, caption: str = None):
-    """
-    Envia mensagem com imagem via MegaAPI
-    """
-    return await send_interactive_message(phone, "image", {
-        "url": image_url,
-        "caption": caption
-    })
-
-async def send_location_message(phone: str, latitude: float, longitude: float, name: str = None):
-    """
-    Envia mensagem com localização via MegaAPI
-    """
-    return await send_interactive_message(phone, "location", {
-        "latitude": latitude,
-        "longitude": longitude,
-        "name": name
-    })
-
 @router.post("/whatsapp/webhook")
 async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     """
@@ -373,9 +282,6 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         try:
             logger.info(f"Iniciando processamento LLM Router para mensagem: {message.text}")
             
-            # Envia indicador de digitação
-            await send_typing_indicator(message.phone)
-            
             # Força resposta em português do Brasil
             prompt_ptbr = f"""Por favor, responda em português do Brasil de forma natural e coloquial:
 
@@ -390,43 +296,6 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
             )
             
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
-
-            # Verifica se a resposta requer interação
-            if "planos" in message.text.lower() or "preços" in message.text.lower():
-                # Envia lista de planos
-                sections = [
-                    {
-                        "title": "Planos Básicos",
-                        "rows": [
-                            {
-                                "id": "basic_100",
-                                "title": "100 Mega",
-                                "description": "Ideal para uso básico"
-                            },
-                            {
-                                "id": "basic_200",
-                                "title": "200 Mega",
-                                "description": "Bom para streaming"
-                            }
-                        ]
-                    }
-                ]
-                await send_list_message(message.phone, "Confira nossos planos disponíveis:", sections)
-            
-            elif "cobertura" in message.text.lower() or "área" in message.text.lower():
-                # Envia localização da empresa
-                await send_location_message(
-                    message.phone,
-                    latitude=-23.550520,
-                    longitude=-46.633308,
-                    name="G4 TELECOM - Matriz"
-                )
-                # Envia imagem do mapa de cobertura
-                await send_image_message(
-                    message.phone,
-                    image_url="URL_DO_MAPA_DE_COBERTURA",
-                    caption="Mapa de cobertura da G4 TELECOM"
-                )
 
             # Salva a resposta do assistente na memória
             await conversation_manager.add_message(
