@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize OpenAI client with API key
+# Remova quaisquer parâmetros incompatíveis como 'proxies'
 client = AsyncOpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
     base_url="https://api.deepseek.com/v1"

@@ -16,33 +16,6 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     sender: Optional[str] = None
 
-async def handle_memory_command(prompt: str, sender: str) -> Optional[Dict[str, Any]]:
-    """Processa comandos especiais de memória"""
-    commands = {
-        "/memory off": (False, "Memória desativada. O contexto anterior será ignorado."),
-        "/memory on": (True, "Memória ativada. O contexto será mantido."),
-        "/memory clear": (None, "Memória limpa. Todas as mensagens anteriores foram removidas.")
-    }
-    
-    prompt_lower = prompt.lower().strip()
-    if prompt_lower in commands:
-        active, message = commands[prompt_lower]
-        
-        if active is None:
-            # Comando de limpar
-            await conversation_manager.clear_memory(sender)
-        else:
-            # Comando de ativar/desativar
-            await conversation_manager.toggle_memory(sender, active)
-            
-        return {
-            "text": message,
-            "model": "system",
-            "success": True
-        }
-    
-    return None
-
 @router.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     """
@@ -57,13 +30,8 @@ async def chat_endpoint(request: ChatRequest):
         logger.info(f"Prompt: {request.prompt}")
         logger.info(f"Modelo especificado: {request.model}")
         
-        # Se tiver um remetente, verifica comandos de memória
+        # Se tiver um remetente, salva a mensagem do usuário na memória
         if request.sender:
-            command_result = await handle_memory_command(request.prompt, request.sender)
-            if command_result:
-                return command_result
-            
-            # Salva a mensagem do usuário na memória
             await conversation_manager.add_message(
                 sender_phone=request.sender,
                 role="user",
