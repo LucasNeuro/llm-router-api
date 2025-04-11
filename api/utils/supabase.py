@@ -20,28 +20,14 @@ logger.info(f"Inicializando cliente Supabase com URL: {SUPABASE_URL}")
 
 # Inicializa o cliente do Supabase
 try:
-    # Remova quaisquer configurações adicionais para evitar problemas com parâmetros não suportados
-    # como 'proxy', na versão atual do cliente
+    # Na versão 1.0.3 do supabase-py, não há problema com o parâmetro proxy
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     logger.info("Cliente Supabase inicializado com sucesso")
 except Exception as e:
-    if 'proxy' in str(e):
-        # Se o erro for específico do parâmetro proxy, tenta novamente sem ele
-        try:
-            # Alternativamente, podemos tentar importar diretamente o cliente
-            from supabase._sync.client import SyncClient
-            supabase = SyncClient(SUPABASE_URL, SUPABASE_KEY)
-            logger.info("Cliente Supabase inicializado com sucesso (usando SyncClient)")
-        except Exception as inner_e:
-            logger.error(f"Erro ao inicializar Supabase (método alternativo): {str(inner_e)}")
-            logger.error("Verifique se as credenciais estão corretas e se o serviço está disponível")
-            logger.exception("Stacktrace completo:")
-            raise inner_e
-    else:
-        logger.error(f"Erro ao inicializar Supabase: {str(e)}")
-        logger.error("Verifique se as credenciais estão corretas e se o serviço está disponível")
-        logger.exception("Stacktrace completo:")
-        raise e
+    logger.error(f"Erro ao inicializar Supabase: {str(e)}")
+    logger.error("Verifique se as credenciais estão corretas e se o serviço está disponível")
+    logger.exception("Stacktrace completo:")
+    raise e
 
 async def save_llm_data(
     prompt: str,
