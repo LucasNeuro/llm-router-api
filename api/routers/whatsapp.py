@@ -44,8 +44,7 @@ async def send_whatsapp_message(phone: str, message: str):
         url = f"{MEGAAPI_BASE_URL}/rest/sendMessage/megabusiness-MoYuzQehcPQ/text"
         headers = {
             "accept": "*/*",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEGAAPI_API_KEY}"
+            "Content-Type": "application/json"
         }
         payload = {
             "messageData": {
@@ -78,10 +77,6 @@ async def send_to_make(phone: str, message: str, original_message: str, model: s
     Envia mensagem processada para o webhook do Make
     """
     try:
-        # Garante que o telefone está no formato correto
-        if phone.startswith("55"):
-            phone = phone[2:]
-            
         payload = {
             "phone": phone,
             "response": message,
@@ -93,37 +88,18 @@ async def send_to_make(phone: str, message: str, original_message: str, model: s
         logger.info(f"Enviando para Make webhook: {json.dumps(payload, indent=2)}")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                MAKE_WEBHOOK_URL, 
-                json=payload,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            # Log da resposta bruta para debug
-            logger.info(f"Resposta bruta do Make: {response.text}")
-            
-            if response.status_code == 200:
-                try:
-                    response_data = response.json()
-                    logger.info(f"Resposta do Make webhook: {json.dumps(response_data, indent=2)}")
-                    return response_data
-                except json.JSONDecodeError:
-                    # Se a resposta for "Accepted" mas não for JSON, ainda é válido
-                    if response.text.strip() == "Accepted":
-                        logger.info("Make webhook aceitou a requisição com resposta 'Accepted'")
-                        return {"status": "accepted"}
-                    raise
-            else:
-                response.raise_for_status()
+            response = await client.post(MAKE_WEBHOOK_URL, json=payload)
+            response.raise_for_status()
+            response_data = response.json()
+            logger.info(f"Resposta do Make webhook: {json.dumps(response_data, indent=2)}")
+            return response_data
 
     except Exception as e:
         logger.error(f"Erro ao enviar para Make webhook: {str(e)}")
         if isinstance(e, httpx.HTTPError):
             logger.error(f"Status code: {e.response.status_code}")
             logger.error(f"Response body: {e.response.text}")
-        # Não lança exceção HTTP aqui para não interromper o fluxo principal
-        logger.warning("Continuando execução mesmo com erro no Make webhook")
-        return {"status": "error", "detail": str(e)}
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar para Make: {str(e)}")
 
 async def cleanup_sessions(background_tasks: BackgroundTasks):
     """Tarefa em background para limpar sessões inativas"""
@@ -206,13 +182,6 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             
             # Log do número do remetente
             logger.info(f"Número do remetente: {phone}")
-
-            # Salva a mensagem do usuário na memória
-            await conversation_manager.add_message(
-                sender_phone=phone,
-                role="user",
-                content=message_text
-            )
             
         except Exception as e:
             logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
@@ -236,14 +205,6 @@ Lembre-se: Sua resposta DEVE ser em português do Brasil."""
             )
             
             logger.info(f"Resposta do LLM Router: {json.dumps(result, indent=2)}")
-
-            # Salva a resposta do assistente na memória
-            await conversation_manager.add_message(
-                sender_phone=message.phone,
-                role="assistant",
-                content=result["text"],
-                model_used=result["model"]
-            )
 
             # Gera ID único para a requisição
             request_id = str(uuid.uuid4())

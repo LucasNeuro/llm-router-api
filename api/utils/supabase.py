@@ -20,7 +20,6 @@ logger.info(f"Inicializando cliente Supabase com URL: {SUPABASE_URL}")
 
 # Inicializa o cliente do Supabase
 try:
-    # Na versão 1.0.3 do supabase-py, não há problema com o parâmetro proxy
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     logger.info("Cliente Supabase inicializado com sucesso")
 except Exception as e:
