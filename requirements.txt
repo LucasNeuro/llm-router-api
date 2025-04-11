@@ -15,6 +15,7 @@ tenacity
 pytz
 rich
 python-json-logger
-mistralai==1.6.0
+mistralai==0.4.2
 transformers
-deepseek-ai 
+deepseek-ai
+tiktoken 
