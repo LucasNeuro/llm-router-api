@@ -2,7 +2,13 @@ services:
   - type: web
     name: llm-router-api
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install --upgrade pip
+      pip cache purge
+      pip install httpx>=0.25.2,<0.26.0
+      pip install mistralai==0.0.12
+      pip install openai==1.12.0
+      pip install -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHONPATH
