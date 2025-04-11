@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, Optional
 from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+from mistralai.types import Message
 
 client = MistralClient(api_key=os.getenv("MISTRAL_API_KEY"))
 
@@ -12,8 +12,8 @@ async def call_mistral(prompt: str, system_prompt: Optional[str] = None) -> Dict
     try:
         messages = []
         if system_prompt:
-            messages.append(ChatMessage(role="system", content=system_prompt))
-        messages.append(ChatMessage(role="user", content=prompt))
+            messages.append(Message(role="system", content=system_prompt))
+        messages.append(Message(role="user", content=prompt))
 
         response = client.chat(
             model="mistral-large-latest",
