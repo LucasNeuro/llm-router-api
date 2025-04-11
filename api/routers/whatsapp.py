@@ -111,13 +111,6 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     Webhook para receber mensagens do WhatsApp
     """
     try:
-        # Log detalhado de tudo que podemos extrair da requisição
-        logger.info("========== INÍCIO DO WEBHOOK ==========")
-        logger.info(f"Headers: {dict(request.headers)}")
-        logger.info(f"Client IP: {request.client.host}")
-        logger.info(f"Method: {request.method}")
-        logger.info(f"URL: {request.url}")
-        
         # Adiciona tarefa de limpeza em background
         background_tasks.add_task(cleanup_sessions, background_tasks)
         
@@ -140,100 +133,58 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             logger.error(f"Payload inválido, não é um dicionário: {payload}")
             return {"status": "error", "reason": "invalid_payload"}
 
-        # Extrai a mensagem e o telefone - formato MegaAPI
-        logger.info("Tentando extrair dados no formato MegaAPI...")
+        # Verifica se é uma mensagem de texto e não é um ACK
+        if payload.get("messageType") == "message.ack":
+            logger.info("É uma mensagem de confirmação (ACK), ignorando")
+            return {"status": "ignored", "reason": "ack_message"}
+
+        # Verifica se tem a mensagem
+        if not payload.get("message"):
+            logger.info("Não é uma mensagem de texto, ignorando")
+            return {"status": "ignored", "reason": "not_text_message"}
+
+        # Extrai a mensagem do campo correto
+        message_text = None
+        message_data = payload.get("message", {})
+        
+        if isinstance(message_data, dict):
+            if "extendedTextMessage" in message_data:
+                message_text = message_data["extendedTextMessage"].get("text", "")
+            elif "conversation" in message_data:
+                message_text = message_data["conversation"]
+            elif "text" in message_data:
+                message_text = message_data["text"].get("message", "")
+
+        # Se não houver mensagem de texto, ignora
+        if not message_text:
+            logger.info(f"Mensagem sem texto extraível: {json.dumps(message_data, indent=2)}")
+            return {"status": "ignored", "reason": "no_text_content"}
+
+        # Log da mensagem extraída
+        logger.info(f"Mensagem extraída com sucesso: {message_text}")
+
+        # Extrai informações da mensagem
         try:
-            # Formato MegaAPI
-            if "message" in payload:
-                message_data = payload.get("message", {})
+            # Extrai o número do remetente do remoteJid
+            phone = payload.get("key", {}).get("remoteJid", "").split("@")[0]
+            # Remove o prefixo "55" se existir
+            if phone.startswith("55"):
+                phone = phone[2:]
                 
-                # Log de todas as chaves na mensagem para debug
-                if isinstance(message_data, dict):
-                    logger.info(f"Chaves presentes na mensagem: {list(message_data.keys())}")
-                
-                message_text = None
-                
-                # Tenta extrair o texto de vários campos possíveis
-                if isinstance(message_data, dict):
-                    if "extendedTextMessage" in message_data:
-                        message_text = message_data["extendedTextMessage"].get("text", "")
-                    elif "conversation" in message_data:
-                        message_text = message_data["conversation"]
-                    elif "text" in message_data:
-                        if isinstance(message_data["text"], dict):
-                            message_text = message_data["text"].get("message", "")
-                        else:
-                            message_text = message_data["text"]
-                    # Verifica outros campos possíveis
-                    elif "msg" in message_data:
-                        message_text = message_data["msg"]
-                    elif "content" in message_data:
-                        message_text = message_data["content"]
-                elif isinstance(message_data, str):
-                    message_text = message_data
-                
-                # Extrai o número do remetente
-                phone = None
-                
-                # Tenta várias formas de extrair o telefone
-                if "key" in payload and "remoteJid" in payload["key"]:
-                    phone = payload["key"]["remoteJid"].split("@")[0]
-                elif "from" in payload:
-                    phone = payload["from"].split("@")[0]
-                elif "sender" in payload:
-                    phone = payload["sender"].split("@")[0]
-                elif "phone" in payload:
-                    phone = payload["phone"]
-                    
-                # Remove o prefixo "55" se existir
-                if phone and phone.startswith("55"):
-                    phone = phone[2:]
-                    
-                logger.info(f"Extração no formato MegaAPI - Telefone: {phone}, Mensagem: {message_text}")
-            
-            # Se não conseguiu extrair pelo formato padrão, tenta outros formatos
-            if not message_text or not phone:
-                # Tenta formato alternativo
-                logger.info("Tentando extrações alternativas...")
-                
-                if "text" in payload:
-                    message_text = payload["text"]
-                    
-                if "phone" in payload:
-                    phone = payload["phone"]
-                    
-                if "sender" in payload:
-                    phone = payload["sender"]
-                    
-                if "number" in payload:
-                    phone = payload["number"]
-                    
-                logger.info(f"Extração alternativa - Telefone: {phone}, Mensagem: {message_text}")
-                
-            # Se ainda não conseguiu extrair, desiste
-            if not message_text:
-                logger.error(f"Não foi possível extrair o texto da mensagem: {json.dumps(payload, indent=2)}")
-                return {"status": "ignored", "reason": "no_text_content"}
-                
-            if not phone:
-                logger.error(f"Não foi possível extrair o número do telefone: {json.dumps(payload, indent=2)}")
-                return {"status": "ignored", "reason": "no_phone_number"}
-                
-            # Cria o objeto de mensagem
             message = WhatsAppMessage(
                 messageType=payload.get("messageType", "text"),
                 text=message_text,
                 phone=phone,
                 instanceId=payload.get("instance_key", ""),
-                messageId=payload.get("key", {}).get("id", str(time.time())),
-                timestamp=payload.get("messageTimestamp", int(time.time()))
+                messageId=payload.get("key", {}).get("id", ""),
+                timestamp=payload.get("messageTimestamp", 0)
             )
             
-            logger.info(f"Mensagem extraída com sucesso: {message}")
-                
+            # Log do número do remetente
+            logger.info(f"Número do remetente: {phone}")
+            
         except Exception as e:
             logger.error(f"Erro ao extrair informações da mensagem: {str(e)}")
-            logger.exception("Stacktrace completo:")
             return {"status": "error", "reason": "invalid_message_format"}
 
         # Processa a mensagem com o LLM Router

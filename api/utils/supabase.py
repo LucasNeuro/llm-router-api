@@ -43,8 +43,6 @@ async def save_llm_data(
     Salva os dados da requisição LLM no Supabase
     """
     try:
-        logger.info(f"Iniciando salvamento de dados no Supabase para request_id: {request_id}")
-        
         # Extrai informações de custo e tokens
         tokens = cost_analysis.get("tokens", {})
         costs = cost_analysis.get("costs", {})
@@ -80,28 +78,9 @@ async def save_llm_data(
             "tokens_total": int(tokens.get("total", 0))
         }
         
-        logger.info(f"Dados preparados para envio: {json.dumps(data, indent=2, default=str)}")
-        
-        try:
-            logger.info("Enviando dados para tabela llm_router no Supabase...")
-            result = supabase.table("llm_router").insert(data).execute()
-            logger.info(f"Dados salvos com sucesso: {json.dumps(result.data, indent=2, default=str)}")
-            return result
-        except Exception as insert_error:
-            logger.error(f"Erro ao inserir no Supabase: {str(insert_error)}")
-            logger.exception("Stacktrace do erro de inserção:")
-            
-            # Tenta verificar se a tabela existe
-            try:
-                logger.info("Verificando se a tabela llm_router existe...")
-                test_query = supabase.table("llm_router").select("id").limit(1).execute()
-                logger.info(f"Tabela llm_router existe, resultado: {test_query.data}")
-            except Exception as table_error:
-                logger.error(f"Erro ao verificar tabela: {str(table_error)}")
-                
-            return None
+        result = supabase.table("llm_router").insert(data).execute()
+        return result
         
     except Exception as e:
-        logger.error(f"Erro geral ao salvar dados no Supabase: {str(e)}")
-        logger.exception("Stacktrace completo:")
+        logger.error(f"Erro ao salvar dados no Supabase: {str(e)}")
         return None

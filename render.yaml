@@ -1,38 +1,16 @@
 services:
   # Web service
   - type: web
-    name: mpc-api-v2
-    env: python
+    name: llm-router-api
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: cd api && python run.py
+    plan: free
+    autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
       - key: PORT
-        value: 1000
+        value: 10000
       - key: API_HOST
         value: 0.0.0.0
-      # LLM API Keys
-      - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: MISTRAL_API_KEY
-        sync: false
-      - key: GPT_API_KEY
-        sync: false
-      # MegaAPI Configuration
-      - key: MEGAAPI_INSTANCE_ID
-        value: 1290bc3e-0c9f-479b-9cff-c4719e7c6c3b
-      - key: MEGAAPI_API_KEY
-        value: MoYuzQehcPQ
-      - key: MEGAAPI_BASE_URL
-        value: https://apibusiness1.megaapi.com.br
-      # Supabase Configuration
-      - key: SUPABASE_URL
-        value: https://bbexaorzfigomhktcvvq.supabase.co
-      - key: SUPABASE_KEY
-        sync: false
-      # Make Webhook
-      - key: MAKE_WEBHOOK_URL
-        value: https://hook.us2.make.com/hrq5lp1ahhw916uq0tdrqlr8dcmkcs64
+      - key: PYTHON_VERSION
+        value: 3.10.0
