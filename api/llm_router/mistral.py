@@ -21,7 +21,7 @@ async def call_mistral(prompt: str, system_prompt: Optional[str] = None) -> Dict
         })
 
         response = client.chat(
-            model="mistral-large-latest",
+            model="mistral-medium",
             messages=messages
         )
 
