@@ -1,16 +1,16 @@
 services:
   # Web service
   - type: web
-    name: llm-router-api
-    runtime: python
-    buildCommand: pip install -r requirements.txt
+    name: mpc-api
+    env: python
+    buildCommand: chmod +x api/scripts/preinstall.sh && ./api/scripts/preinstall.sh && pip install -r requirements.txt
     startCommand: cd api && python run.py
-    plan: free
-    autoDeploy: true
     envVars:
-      - key: PORT
-        value: 10000
-      - key: API_HOST
-        value: 0.0.0.0
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: 3.11.0
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        value: https://bbexaorzfigomhktcvvq.supabase.co
+      - key: SUPABASE_KEY
+        sync: false
