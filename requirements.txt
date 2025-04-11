@@ -8,7 +8,7 @@ openai==1.12.0
 requests==2.31.0
 httpx>=0.25.2,<0.26.0
 tiktoken==0.5.2
-supabase==2.3.1
+supabase>=1.0.3,<2.0.0
 anthropic==0.18.1
 python-jose==3.3.0
 passlib==1.7.4
