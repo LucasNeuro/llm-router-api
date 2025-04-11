@@ -48,7 +48,7 @@ app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 
 # Router do WhatsApp sem prefixo para compatibilidade com MegaAPI
-app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
+app.include_router(whatsapp.router, prefix="/api", tags=["whatsapp"])
 
 @app.on_event("startup")
 async def startup_event():

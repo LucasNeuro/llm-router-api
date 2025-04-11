@@ -128,38 +128,51 @@ class LLMRouter:
             logger.info(f"Indicadores: {json.dumps(indicators, indent=2)}")
             
             # Chama o modelo escolhido
-            response = await self.models[chosen_model](full_prompt, **kwargs)
-            # Garante que a resposta seja uma string
-            if isinstance(response, dict):
-                response = response.get("text", str(response))
-            
-            result = {
-                "text": str(response),
-                "model": chosen_model,
-                "success": True,
-                "confidence": confidence,
-                "model_scores": model_scores,
-                "indicators": indicators,
-                "has_context": bool(context) if 'context' in locals() else False
-            }
-            
-            # Salva no cache
-            if use_cache:
-                await cache_manager.cache_response(prompt, result, chosen_model)
-            
-            # Adiciona resposta do assistente à memória
-            if sender_phone:
-                logger.info("Salvando resposta do assistente na memória")
-                await conversation_manager.add_message(
-                    sender_phone=sender_phone,
-                    role="assistant",
-                    content=response,
-                    model_used=chosen_model,
-                    save_to_db=True
-                )
-            
-            return result
-            
+            try:
+                response = await self.models[chosen_model](full_prompt, **kwargs)
+                # Garante que a resposta seja uma string
+                if isinstance(response, dict):
+                    response = response.get("text", str(response))
+                
+                result = {
+                    "text": str(response),
+                    "model": chosen_model,
+                    "success": True,
+                    "confidence": confidence,
+                    "model_scores": model_scores,
+                    "indicators": indicators,
+                    "has_context": bool(context) if 'context' in locals() else False
+                }
+                
+                # Salva no cache apenas se a resposta for bem sucedida
+                if use_cache and result["success"]:
+                    await cache_manager.cache_response(prompt, result, chosen_model)
+                
+                # Adiciona resposta do assistente à memória apenas se for bem sucedida
+                if sender_phone and result["success"]:
+                    logger.info("Salvando resposta do assistente na memória")
+                    await conversation_manager.add_message(
+                        sender_phone=sender_phone,
+                        role="assistant",
+                        content=response,
+                        model_used=chosen_model,
+                        save_to_db=True
+                    )
+                
+                return result
+                
+            except Exception as e:
+                error_msg = f"Erro ao chamar modelo {chosen_model}: {str(e)}"
+                logger.error(error_msg)
+                return {
+                    "text": error_msg,
+                    "model": chosen_model,
+                    "success": False,
+                    "confidence": confidence,
+                    "model_scores": model_scores,
+                    "indicators": indicators
+                }
+
         except Exception as e:
             logger.error(f"Erro ao rotear prompt: {str(e)}")
             logger.exception("Stacktrace completo:")

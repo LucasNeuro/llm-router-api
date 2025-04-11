@@ -77,16 +77,21 @@ class ConversationManager:
                 "last_update": datetime.utcnow().isoformat()
             }
             
-            supabase.table(self.table_name)\
+            result = supabase.table(self.table_name)\
                 .update(data)\
                 .eq("sender_phone", sender_phone)\
                 .execute()
             
+            if not result.data:
+                logger.error(f"Falha ao atualizar memória para {sender_phone}")
+                return
+                
             logger.info(f"Memória atualizada para {sender_phone}: {len(messages)} mensagens")
 
         except Exception as e:
             logger.error(f"Erro ao adicionar mensagem: {str(e)}")
             logger.exception("Stacktrace completo:")
+            # Não propaga o erro para não interromper o fluxo principal
 
     async def format_conversation_for_llm(self, sender_phone: str, max_tokens: int = 4000) -> str:
         """Formata a conversa para o LLM"""
