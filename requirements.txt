@@ -14,4 +14,7 @@ Jinja2
 tenacity
 pytz
 rich
-python-json-logger 
+python-json-logger
+mistralai
+transformers
+deepseek-ai 
