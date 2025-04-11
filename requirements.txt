@@ -15,6 +15,6 @@ tenacity
 pytz
 rich
 python-json-logger
-mistral-client
+mistralai
 transformers
 deepseek-ai 
