@@ -5,7 +5,7 @@ from api.utils.logger import logger
 
 class HistoryManager:
     def __init__(self):
-        self.table_name = "message_history"
+        self.table_name = "conversation_memory"
     
     async def save_message(
         self,
@@ -18,7 +18,7 @@ class HistoryManager:
         error_message: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Salva uma mensagem no histórico
+        Salva uma mensagem no histórico usando a tabela conversation_memory
         
         Args:
             sender_phone: Número do remetente
@@ -33,18 +33,54 @@ class HistoryManager:
             Dict com os dados salvos
         """
         try:
-            data = {
-                "sender_phone": sender_phone,
-                "message_type": message_type,
-                "content": content,
-                "model_used": model_used,
-                "response": response,
-                "success": success,
-                "error_message": error_message,
-                "updated_at": datetime.utcnow().isoformat()
-            }
-            
-            result = supabase.table(self.table_name).insert(data).execute()
+            # Tenta recuperar o registro existente
+            result = supabase.table(self.table_name)\
+                .select("*")\
+                .eq("sender_phone", sender_phone)\
+                .execute()
+
+            if not result.data:
+                # Cria novo registro se não existir
+                data = {
+                    "sender_phone": sender_phone,
+                    "conversation_memory": {
+                        "messages": [{
+                            "role": message_type,
+                            "content": content,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "model_used": model_used,
+                            "success": success,
+                            "error_message": error_message
+                        }]
+                    }
+                }
+                result = supabase.table(self.table_name).insert(data).execute()
+                logger.info(f"Novo registro de memória criado para {sender_phone}")
+            else:
+                # Atualiza registro existente
+                memory = result.data[0]
+                messages = memory["conversation_memory"]["messages"]
+                
+                # Adiciona nova mensagem
+                messages.append({
+                    "role": message_type,
+                    "content": content,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "model_used": model_used,
+                    "success": success,
+                    "error_message": error_message
+                })
+                
+                # Atualiza o registro
+                data = {
+                    "conversation_memory": {"messages": messages},
+                    "last_update": datetime.utcnow().isoformat()
+                }
+                
+                result = supabase.table(self.table_name)\
+                    .update(data)\
+                    .eq("sender_phone", sender_phone)\
+                    .execute()
             
             if not result.data:
                 logger.error(f"Falha ao salvar mensagem no histórico para {sender_phone}")
@@ -79,17 +115,21 @@ class HistoryManager:
             result = supabase.table(self.table_name)\
                 .select("*")\
                 .eq("sender_phone", sender_phone)\
-                .order("created_at", desc=True)\
-                .limit(limit)\
-                .offset(offset)\
                 .execute()
                 
             if not result.data:
                 return {"messages": [], "total": 0}
                 
+            memory = result.data[0]
+            messages = memory["conversation_memory"]["messages"]
+            
+            # Aplica paginação
+            total = len(messages)
+            paginated_messages = messages[offset:offset + limit]
+            
             return {
-                "messages": result.data,
-                "total": len(result.data)
+                "messages": paginated_messages,
+                "total": total
             }
             
         except Exception as e:

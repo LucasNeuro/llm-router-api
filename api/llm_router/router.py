@@ -6,6 +6,7 @@ from .mistral import call_mistral
 from .gemini import call_gemini
 from loguru import logger
 from api.utils.conversation_memory import conversation_manager
+from api.utils.history_manager import history_manager
 from api.utils.cache_manager import cache_manager
 import json
 
@@ -45,6 +46,14 @@ class LLMRouter:
             logger.info(f"Iniciando roteamento para sender_phone: {sender_phone}")
             logger.info(f"Prompt recebido: {prompt}")
             
+            # Salva a mensagem do usuário no histórico
+            if sender_phone:
+                await history_manager.save_message(
+                    sender_phone=sender_phone,
+                    message_type="user",
+                    content=prompt
+                )
+            
             # Verifica cache primeiro
             if use_cache:
                 cached_response = await cache_manager.get_cached_response(prompt)
@@ -64,6 +73,14 @@ class LLMRouter:
                             content=cached_response["text"],
                             model_used=cached_response["model"],
                             save_to_db=True
+                        )
+                        # Salva a resposta no histórico
+                        await history_manager.save_message(
+                            sender_phone=sender_phone,
+                            message_type="assistant",
+                            content=cached_response["text"],
+                            model_used=cached_response["model"],
+                            success=True
                         )
                     return cached_response
 
@@ -88,33 +105,59 @@ class LLMRouter:
             # Se um modelo específico foi solicitado, use-o
             if model and model in self.models:
                 logger.info(f"Usando modelo específico: {model}")
-                response = await self.models[model](full_prompt, **kwargs)
-                # Garante que a resposta seja uma string
-                if isinstance(response, dict):
-                    response = response.get("text", str(response))
-                
-                result = {
-                    "text": str(response),
-                    "model": model,
-                    "success": True
-                }
-                
-                # Salva no cache
-                if use_cache:
-                    await cache_manager.cache_response(prompt, result, model)
-                
-                # Adiciona resposta do assistente à memória
-                if sender_phone:
-                    logger.info("Salvando resposta do assistente na memória")
-                    await conversation_manager.add_message(
-                        sender_phone=sender_phone,
-                        role="assistant",
-                        content=response,
-                        model_used=model,
-                        save_to_db=True
-                    )
-                
-                return result
+                try:
+                    response = await self.models[model](full_prompt, **kwargs)
+                    # Garante que a resposta seja uma string
+                    if isinstance(response, dict):
+                        response = response.get("text", str(response))
+                    
+                    result = {
+                        "text": str(response),
+                        "model": model,
+                        "success": True
+                    }
+                    
+                    # Salva no cache
+                    if use_cache:
+                        await cache_manager.cache_response(prompt, result, model)
+                    
+                    # Adiciona resposta do assistente à memória e histórico
+                    if sender_phone:
+                        logger.info("Salvando resposta do assistente")
+                        await conversation_manager.add_message(
+                            sender_phone=sender_phone,
+                            role="assistant",
+                            content=response,
+                            model_used=model,
+                            save_to_db=True
+                        )
+                        await history_manager.save_message(
+                            sender_phone=sender_phone,
+                            message_type="assistant",
+                            content=response,
+                            model_used=model,
+                            success=True
+                        )
+                    
+                    return result
+                    
+                except Exception as e:
+                    error_msg = f"Erro ao chamar modelo {model}: {str(e)}"
+                    logger.error(error_msg)
+                    if sender_phone:
+                        await history_manager.save_message(
+                            sender_phone=sender_phone,
+                            message_type="assistant",
+                            content=error_msg,
+                            model_used=model,
+                            success=False,
+                            error_message=str(e)
+                        )
+                    return {
+                        "text": error_msg,
+                        "model": model,
+                        "success": False
+                    }
                 
             # Caso contrário, use o classificador para escolher o modelo
             classification = classify_prompt(prompt)
@@ -148,9 +191,9 @@ class LLMRouter:
                 if use_cache and result["success"]:
                     await cache_manager.cache_response(prompt, result, chosen_model)
                 
-                # Adiciona resposta do assistente à memória apenas se for bem sucedida
+                # Adiciona resposta do assistente à memória e histórico
                 if sender_phone and result["success"]:
-                    logger.info("Salvando resposta do assistente na memória")
+                    logger.info("Salvando resposta do assistente")
                     await conversation_manager.add_message(
                         sender_phone=sender_phone,
                         role="assistant",
@@ -158,12 +201,28 @@ class LLMRouter:
                         model_used=chosen_model,
                         save_to_db=True
                     )
+                    await history_manager.save_message(
+                        sender_phone=sender_phone,
+                        message_type="assistant",
+                        content=response,
+                        model_used=chosen_model,
+                        success=True
+                    )
                 
                 return result
                 
             except Exception as e:
                 error_msg = f"Erro ao chamar modelo {chosen_model}: {str(e)}"
                 logger.error(error_msg)
+                if sender_phone:
+                    await history_manager.save_message(
+                        sender_phone=sender_phone,
+                        message_type="assistant",
+                        content=error_msg,
+                        model_used=chosen_model,
+                        success=False,
+                        error_message=str(e)
+                    )
                 return {
                     "text": error_msg,
                     "model": chosen_model,
@@ -176,6 +235,14 @@ class LLMRouter:
         except Exception as e:
             logger.error(f"Erro ao rotear prompt: {str(e)}")
             logger.exception("Stacktrace completo:")
+            if sender_phone:
+                await history_manager.save_message(
+                    sender_phone=sender_phone,
+                    message_type="assistant",
+                    content=f"Erro ao processar prompt: {str(e)}",
+                    success=False,
+                    error_message=str(e)
+                )
             return {
                 "text": f"Erro ao processar prompt: {str(e)}",
                 "model": model or "unknown",
