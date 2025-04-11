@@ -6,14 +6,22 @@ services:
       pip install --upgrade pip
       pip cache purge
       
-      # Primeiro, instalar httpx na versão exigida pelo mistralai
-      pip install httpx==0.25.2
+      # Criar diretório temporário para downloads
+      mkdir -p /tmp/wheels
       
-      # Instalar pacotes principais com --no-dependencies
-      pip install --no-dependencies mistralai==0.0.12
-      pip install --no-dependencies openai==1.12.0
-      pip install --no-dependencies supabase==1.0.3
-      pip install --no-dependencies anthropic==0.18.1
+      # Baixar os wheels dos pacotes principais
+      pip download httpx==0.25.2 -d /tmp/wheels
+      pip download mistralai==0.0.12 -d /tmp/wheels
+      pip download openai==1.12.0 -d /tmp/wheels
+      pip download supabase==1.0.3 -d /tmp/wheels
+      pip download anthropic==0.18.1 -d /tmp/wheels
+      
+      # Instalar apenas os wheels baixados, sem verificar dependências
+      pip install --no-index --no-deps --find-links=/tmp/wheels httpx==0.25.2
+      pip install --no-index --no-deps --find-links=/tmp/wheels mistralai==0.0.12
+      pip install --no-index --no-deps --find-links=/tmp/wheels openai==1.12.0
+      pip install --no-index --no-deps --find-links=/tmp/wheels supabase==1.0.3
+      pip install --no-index --no-deps --find-links=/tmp/wheels anthropic==0.18.1
       
       # Instalar dependências comuns necessárias
       pip install pydantic==2.11.3
@@ -24,21 +32,19 @@ services:
       pip install orjson==3.10.15
       pip install httpcore==1.0.7
       
-      # Instalar o resto dos pacotes individualmente
-      pip install fastapi==0.109.2
-      pip install uvicorn==0.27.1
-      pip install python-dotenv==1.0.1
-      pip install neo4j==5.17.0
-      pip install google-generativeai==0.3.2
-      pip install requests==2.31.0
-      pip install tiktoken==0.5.2
-      pip install python-jose==3.3.0
-      pip install passlib==1.7.4
-      pip install bcrypt==4.1.2
-      pip install rich==13.7.0
-      pip install loguru==0.7.2
-      pip install python-json-logger==2.0.7
-      pip install tenacity==8.2.3
+      # Instalar o resto dos pacotes exceto os que já instalamos
+      pip install -r requirements.txt --no-deps
+      
+      # Instalar dependências finais
+      pip install starlette==0.36.3
+      pip install h11==0.14.0
+      pip install click==8.1.8
+      pip install idna==3.10
+      pip install urllib3==2.3.0
+      pip install charset-normalizer==3.4.1
+      
+      # Limpar arquivos temporários
+      rm -rf /tmp/wheels
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHONPATH
