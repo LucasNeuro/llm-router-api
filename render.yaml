@@ -5,11 +5,13 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip cache purge
-      pip install httpx>=0.23.0,<0.24.0
+      # Instalar mistralai primeiro para que suas dependências sejam respeitadas
+      pip install mistralai==0.0.12
+      # Depois instalar os outros pacotes não conflitantes
+      pip install openai==1.12.0
       pip install supabase==1.0.3
       pip install anthropic==0.18.1
-      pip install mistralai==0.0.12
-      pip install openai==1.12.0
+      # Por último, instalar o resto dos requerimentos
       pip install -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
