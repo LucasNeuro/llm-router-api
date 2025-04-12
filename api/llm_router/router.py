@@ -9,73 +9,7 @@ from .gpt import call_gpt
 from .prompt_classifier import classify_prompt
 from ..utils.cache_manager import cache_manager
 from ..utils.conversation_memory import conversation_manager
-from ..utils.audio_service import audio_service, AudioService
-from ..utils.supabase import supabase, save_llm_data
-
-class PersonaConfig:
-    """Configuração da persona do assistente"""
-    
-    # Vozes disponíveis na OpenAI
-    VOICES = {
-        "ALLOY": "alloy",      # Voz neutra e profissional
-        "ECHO": "echo",        # Voz mais suave e acolhedora
-        "FABLE": "fable",      # Voz mais jovem e animada
-        "ONYX": "onyx",        # Voz mais grave e confiante
-        "NOVA": "nova",        # Voz mais natural e conversacional
-        "SHIMMER": "shimmer"   # Voz mais clara e articulada
-    }
-    
-    # Personas pré-definidas
-    PERSONAS = {
-        "AMIGAVEL": {
-            "voice": VOICES["NOVA"],
-            "description": "Assistente amigável e acolhedor, usa linguagem informal e emojis",
-            "personality_prompt": """
-                Você é um assistente amigável e acolhedor. Use uma linguagem informal e natural.
-                Adicione emojis ocasionalmente para tornar a conversa mais leve.
-                Evite linguagem muito técnica, prefira explicações simples e diretas.
-                Seja empático e mostre interesse genuíno nas questões do usuário.
-            """
-        },
-        "PROFISSIONAL": {
-            "voice": VOICES["ALLOY"],
-            "description": "Assistente profissional e objetivo, mantém formalidade adequada",
-            "personality_prompt": """
-                Você é um assistente profissional e objetivo.
-                Use linguagem clara e formal, mas não excessivamente técnica.
-                Mantenha um tom respeitoso e profissional.
-                Foque em respostas precisas e bem estruturadas.
-            """
-        },
-        "ESPECIALISTA": {
-            "voice": VOICES["ONYX"],
-            "description": "Especialista técnico com profundo conhecimento",
-            "personality_prompt": """
-                Você é um especialista com profundo conhecimento técnico.
-                Use termos técnicos quando apropriado, mas saiba explicá-los.
-                Mantenha um tom confiante e assertivo.
-                Forneça explicações detalhadas quando necessário.
-            """
-        }
-    }
-    
-    @staticmethod
-    def get_persona_prompt(persona_type: str) -> str:
-        """Retorna o prompt de personalidade para a persona selecionada"""
-        persona = PersonaConfig.PERSONAS.get(persona_type.upper())
-        if not persona:
-            # Se não encontrar, usa a persona amigável como padrão
-            return PersonaConfig.PERSONAS["AMIGAVEL"]["personality_prompt"]
-        return persona["personality_prompt"]
-    
-    @staticmethod
-    def get_voice(persona_type: str) -> str:
-        """Retorna a voz para a persona selecionada"""
-        persona = PersonaConfig.PERSONAS.get(persona_type.upper())
-        if not persona:
-            # Se não encontrar, usa a voz nova como padrão
-            return PersonaConfig.VOICES["NOVA"]
-        return persona["voice"]
+from ..utils.audio_service import audio_service
 
 class LLMRouter:
     """
@@ -105,14 +39,6 @@ class LLMRouter:
         self.fallback_order = ["deepseek", "mistral", "gemini", "gpt"]
         
         logger.info(f"LLM Router inicializado com {len(self.models)} modelos: {', '.join(self.models.keys())}")
-        
-        self.current_persona = "AMIGAVEL"  # Persona padrão
-        
-    def set_persona(self, persona_type: str):
-        """Define a persona atual"""
-        if persona_type.upper() in PersonaConfig.PERSONAS:
-            self.current_persona = persona_type.upper()
-            logger.info(f"Persona alterada para: {self.current_persona}")
         
     async def _try_model_with_fallback(self, model_name: str, prompt: str, **kwargs) -> Dict[str, Any]:
         """
@@ -199,94 +125,198 @@ class LLMRouter:
         **kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Roteia um prompt para o modelo mais apropriado
+        Roteia o prompt para o modelo mais apropriado.
+        
+        Args:
+            prompt: O texto do prompt
+            sender_phone: Número do remetente para contexto
+            model: Modelo específico a ser usado (opcional)
+            use_cache: Se deve usar o cache
+            generate_audio: Se deve gerar áudio da resposta
+            **kwargs: Argumentos adicionais para a chamada do modelo
+            
+        Returns:
+            Dict com a resposta e metadados
         """
         try:
-            # Se for para gerar áudio, usa o GPT diretamente
+            logger.info(f"Iniciando roteamento para sender_phone: {sender_phone}")
+            logger.info(f"Prompt recebido: {prompt}")
+            
+            # Se for solicitado geração de áudio, usa prioritariamente o GPT
             if generate_audio and "gpt" in self.models:
+                logger.info("Geração de áudio solicitada, usando GPT prioritariamente")
                 model = "gpt"
-                logger.info("Usando GPT para geração de áudio")
             
-            # Se não tiver modelo específico, classifica o prompt
-            if not model:
-                classification = await classify_prompt(prompt)
-                model = classification["best_model"]
-                logger.info(f"Modelo escolhido por classificação: {model}")
-            
-            # Verifica cache se habilitado
-            if use_cache:
-                cached = await cache_manager.get_cached_response(prompt)
-                if cached:
-                    logger.info("Resposta encontrada no cache")
-                    if sender_phone:
-                        # Atualiza contexto mesmo com resposta do cache
-                        await conversation_manager.update_conversation_context(
-                            sender_phone, prompt, cached["response"]
-                        )
-                    return cached
-
-            # Obtém contexto da conversa se tiver sender_phone
-            context = []
+            # Adiciona mensagem do usuário à memória
             if sender_phone:
-                context = await conversation_manager.get_conversation_context(sender_phone)
-                if context:
-                    # Adiciona contexto ao prompt
-                    formatted_context = "\n".join([
-                        f"{'Usuário' if msg['role'] == 'user' else 'Assistente'}: {msg['content']}"
-                        for msg in context[-5:]  # Usa últimas 5 mensagens
-                    ])
-                    prompt = f"Contexto anterior:\n{formatted_context}\n\nNova mensagem: {prompt}"
-
-            # Adiciona prompt de personalidade se tiver persona definida
-            personality_prompt = PersonaConfig.get_persona_prompt(self.current_persona)
-            if personality_prompt:
-                prompt = f"{personality_prompt}\n\n{prompt}"
-
-            # Chama o modelo com fallback
-            response = await self._try_model_with_fallback(model, prompt, **kwargs)
-            
-            # Se geração de áudio foi solicitada
-            if generate_audio and response.get("success", True):
-                try:
-                    voice = kwargs.get("voice", PersonaConfig.get_voice(self.current_persona))
-                    audio_result = await audio_service.text_to_speech(
-                        text=response["text"],
-                        voice=voice
-                    )
-                    if audio_result.get("success"):
-                        response["audio_url"] = audio_result.get("public_url")
-                        response["audio_path"] = audio_result.get("file_path")
-                except Exception as e:
-                    logger.error(f"Erro ao gerar áudio: {str(e)}")
-                    response["audio_error"] = str(e)
-
-            # Atualiza cache e contexto
-            if response.get("success", True) and use_cache:
-                await cache_manager.cache_response(prompt, response)
-                
-            if sender_phone and response.get("success", True):
-                await conversation_manager.update_conversation_context(
-                    sender_phone, prompt, response["text"]
+                logger.info("Adicionando mensagem do usuário à memória")
+                await conversation_manager.add_message(
+                    sender_phone=sender_phone,
+                    role="user",
+                    content=prompt,
+                    save_to_db=True
                 )
-
-            return response
-
+            
+            # Verifica cache primeiro
+            if use_cache:
+                cached_response = await cache_manager.get_cached_response(prompt)
+                if cached_response:
+                    logger.info("Resposta encontrada no cache")
+                    
+                    # Adiciona resposta do cache à memória
+                    if sender_phone:
+                        await conversation_manager.add_message(
+                            sender_phone=sender_phone,
+                            role="assistant",
+                            content=cached_response["text"],
+                            model_used=cached_response["model"],
+                            save_to_db=True
+                        )
+                    
+                    # Se precisar gerar áudio, gera a partir do texto do cache
+                    audio_info = None
+                    if generate_audio:
+                        logger.info("Gerando áudio para resposta do cache")
+                        try:
+                            audio_result = await audio_service.text_to_speech(
+                                text=cached_response["text"],
+                                request_id=str(datetime.utcnow().timestamp())
+                            )
+                            audio_info = audio_result
+                        except Exception as audio_error:
+                            logger.error(f"Erro ao gerar áudio: {str(audio_error)}")
+                    
+                    result = {
+                        "text": cached_response["text"],
+                        "model": cached_response["model"],
+                        "success": True,
+                        "from_cache": True,
+                        "cache_info": {
+                            "hit_count": cached_response.get("hit_count", 1),
+                            "cached_at": cached_response.get("created_at", datetime.utcnow().isoformat()),
+                            "last_accessed": cached_response.get("last_accessed", datetime.utcnow().isoformat())
+                        },
+                        "has_memory": bool(sender_phone)
+                    }
+                    
+                    # Adiciona informações de áudio ao resultado se gerado
+                    if audio_info:
+                        result["audio"] = audio_info
+                    
+                    return result
+            
+            # Se um modelo específico foi solicitado
+            if model:
+                # Verifica se o modelo solicitado existe
+                if model not in self.models and model not in self.fallback_order:
+                    logger.warning(f"Modelo solicitado '{model}' não existe, usando classificação automática")
+                    model = None
+                else:
+                    # Chama o modelo com fallback automático
+                    response = await self._try_model_with_fallback(model, prompt, **kwargs)
+                    
+                    # Adiciona resposta à memória
+                    if sender_phone:
+                        await conversation_manager.add_message(
+                            sender_phone=sender_phone,
+                            role="assistant",
+                            content=response["text"],
+                            model_used=response["model"],
+                            save_to_db=True
+                        )
+                    
+                    # Gera áudio se solicitado
+                    audio_info = None
+                    if generate_audio:
+                        try:
+                            audio_result = await audio_service.text_to_speech(
+                                text=response["text"],
+                                request_id=str(datetime.utcnow().timestamp())
+                            )
+                            audio_info = audio_result
+                        except Exception as audio_error:
+                            logger.error(f"Erro ao gerar áudio: {str(audio_error)}")
+                    
+                    result = {
+                        "text": response["text"],
+                        "model": response["model"],
+                        "success": True,
+                        "from_cache": False,
+                        "has_memory": bool(sender_phone)
+                    }
+                    
+                    # Adiciona informações de áudio ao resultado se gerado
+                    if audio_info:
+                        result["audio"] = audio_info
+                    
+                    # Salva no cache
+                    if use_cache:
+                        await cache_manager.cache_response(prompt, result, response["model"])
+                    
+                    return result
+            
+            # Se não foi especificado um modelo, usa classificação automática
+            classification = await classify_prompt(prompt)
+            chosen_model = classification["best_model"]
+            confidence = classification["confidence"]
+            model_scores = classification["model_scores"]
+            indicators = classification["indicators"]
+            
+            logger.info(f"Classificação: modelo={chosen_model}, confiança={confidence}")
+            
+            # Chama o modelo escolhido com fallback automático
+            response = await self._try_model_with_fallback(chosen_model, prompt, **kwargs)
+            response_text = response["text"]
+            used_model = response["model"]
+            used_fallback = response.get("used_fallback", False)
+            
+            # Adiciona resposta à memória
+            if sender_phone:
+                await conversation_manager.add_message(
+                    sender_phone=sender_phone,
+                    role="assistant",
+                    content=response_text,
+                    model_used=used_model,
+                    save_to_db=True
+                )
+            
+            # Gera áudio se solicitado
+            audio_info = None
+            if generate_audio:
+                try:
+                    audio_result = await audio_service.text_to_speech(
+                        text=response_text,
+                        request_id=str(datetime.utcnow().timestamp())
+                    )
+                    audio_info = audio_result
+                except Exception as audio_error:
+                    logger.error(f"Erro ao gerar áudio: {str(audio_error)}")
+            
+            result = {
+                "text": response_text,
+                "model": used_model,
+                "classified_model": chosen_model,
+                "confidence": confidence,
+                "model_scores": model_scores,
+                "indicators": indicators,
+                "used_fallback": used_fallback,
+                "fallback_info": response.get("fallback_info", []),
+                "success": True,
+                "from_cache": False,
+                "has_memory": bool(sender_phone)
+            }
+            
+            # Adiciona informações de áudio ao resultado se gerado
+            if audio_info:
+                result["audio"] = audio_info
+            
+            # Salva no cache
+            if use_cache:
+                await cache_manager.cache_response(prompt, result, used_model)
+            
+            return result
+            
         except Exception as e:
             logger.error(f"Erro no roteamento: {str(e)}")
-            return {
-                "text": "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.",
-                "success": False,
-                "error": str(e)
-            }
-
-    async def _generate_response(self, prompt: str, model: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Gera resposta usando o modelo especificado
-        TODO: Implementar integração com diferentes modelos
-        """
-        # Placeholder - implementar integração real
-        return {
-            "text": "Esta é uma resposta de exemplo.",
-            "request_id": "123",
-            "model_used": model or "default"
-            }
+            logger.exception("Stacktrace completo:")
+            raise

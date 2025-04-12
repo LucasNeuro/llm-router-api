@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import httpx
@@ -7,7 +7,7 @@ from ..llm_router.router import LLMRouter
 from ..llm_router.cost_analyzer import analyze_cost
 from ..utils.supabase import save_llm_data
 from ..utils.conversation_memory import conversation_manager
-from ..utils.audio_service import audio_service, AudioService
+from ..utils.audio_service import audio_service
 import uuid
 import json
 from api.utils.logger import logger
@@ -35,12 +35,6 @@ class WhatsAppMessage(BaseModel):
     messageId: str
     timestamp: int
     is_audio: bool = False
-
-class WhatsAppAudioResponse(BaseModel):
-    transcription: str
-    response_text: str
-    audio_url: str
-    model_used: str
 
 async def send_whatsapp_message(phone: str, message: str):
     """
@@ -406,71 +400,3 @@ async def whatsapp_status():
             "instance_id": "megabusiness-MoYuzQehcPQ",
             "error": str(e)
         }
-
-@router.post("/audio", response_model=WhatsAppAudioResponse)
-async def process_whatsapp_audio(
-    audio: UploadFile = File(...),
-    sender_phone: str = Form(...),
-    file_extension: str = Form("ogg")
-):
-    """
-    Processa áudio recebido do WhatsApp:
-    1. Salva o áudio
-    2. Transcreve para texto
-    3. Processa com LLM
-    4. Gera resposta em áudio
-    5. Retorna URLs e textos
-    """
-    try:
-        request_id = str(uuid.uuid4())
-        logger.info(f"Processando áudio do WhatsApp - ID: {request_id}, Remetente: {sender_phone}")
-        
-        # 1. Lê e salva o áudio
-        audio_content = await audio.read()
-        save_result = await AudioService.save_whatsapp_audio(
-            audio_data=audio_content,
-            request_id=request_id,
-            file_extension=file_extension
-        )
-        
-        if not save_result["success"]:
-            raise HTTPException(status_code=500, detail="Falha ao salvar áudio")
-            
-        # 2. Processa o áudio (transcrição)
-        process_result = await AudioService.process_whatsapp_audio(
-            audio_url=save_result["file_path"],
-            request_id=request_id,
-            sender_phone=sender_phone
-        )
-        
-        if not process_result["success"]:
-            raise HTTPException(status_code=500, detail="Falha ao processar áudio")
-            
-        # 3. Processa com LLM Router
-        llm_router = LLMRouter()
-        llm_response = await llm_router.route_prompt(
-            prompt=process_result["transcription"],
-            sender_phone=sender_phone,
-            use_cache=True
-        )
-        
-        # 4. Gera resposta em áudio
-        tts_result = await AudioService.text_to_speech(
-            text=llm_response["response"],
-            request_id=request_id
-        )
-        
-        if not tts_result["success"]:
-            raise HTTPException(status_code=500, detail="Falha ao gerar áudio de resposta")
-            
-        # 5. Retorna resultado completo
-        return WhatsAppAudioResponse(
-            transcription=process_result["transcription"],
-            response_text=llm_response["response"],
-            audio_url=tts_result["public_url"],
-            model_used=llm_response["model"]
-        )
-        
-    except Exception as e:
-        logger.error(f"Erro ao processar áudio do WhatsApp: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))

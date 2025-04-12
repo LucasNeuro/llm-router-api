@@ -11,13 +11,11 @@ from ..utils.supabase import supabase
 
 GPT_API_KEY = os.getenv("GPT_API_KEY")
 
-# Nome do bucket no Supabase Storage
-SUPABASE_AUDIO_BUCKET = "audiomessages"
+# Nome do bucket no Supabase Storage (usando o bucket existente)
+SUPABASE_AUDIO_BUCKET = "audiomessages"  # Mantendo o nome exato como está no Supabase
 
 class AudioService:
     """Serviço para converter texto em áudio e transcrição de áudio para texto com armazenamento em Supabase"""
-    
-    ALLOWED_AUDIO_FORMATS = ["ogg", "mp3", "wav", "m4a"]
     
     @staticmethod
     def get_temp_path(filename: str) -> str:
@@ -39,93 +37,7 @@ class AudioService:
             raise  # Re-lança o erro para ser tratado no nível acima
     
     @staticmethod
-    async def save_whatsapp_audio(audio_data: bytes, request_id: str, file_extension: str = "ogg") -> dict:
-        """Salva áudio do WhatsApp no bucket existente"""
-        try:
-            # Verifica formato do áudio
-            if file_extension.lower() not in AudioService.ALLOWED_AUDIO_FORMATS:
-                raise ValueError(f"Formato de áudio não suportado: {file_extension}")
-            
-            # Salva temporariamente
-            temp_path = AudioService.get_temp_path(f"whatsapp_{request_id}.{file_extension}")
-            try:
-                with open(temp_path, "wb") as f:
-                    f.write(audio_data)
-                
-                # Upload para o Supabase
-                file_path = f"whatsapp/incoming/{request_id}.{file_extension}"
-                with open(temp_path, "rb") as f:
-                    supabase.storage.from_(SUPABASE_AUDIO_BUCKET).upload(
-                        path=file_path,
-                        file=f,
-                        file_options={"content-type": f"audio/{file_extension}"}
-                    )
-                
-                # Gera URL pública
-                public_url = supabase.storage.from_(SUPABASE_AUDIO_BUCKET).get_public_url(file_path)
-                
-                return {
-                    "success": True,
-                    "file_path": file_path,
-                    "public_url": public_url,
-                    "local_path": temp_path
-                }
-            
-            except Exception as e:
-                logger.error(f"Erro ao salvar áudio do WhatsApp: {str(e)}")
-                raise
-            
-        finally:
-            # Limpa arquivo temporário se existir
-            if 'temp_path' in locals() and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                    logger.info(f"Arquivo temporário removido: {temp_path}")
-                except Exception as e:
-                    logger.warning(f"Erro ao remover arquivo temporário: {str(e)}")
-    
-    @staticmethod
-    async def process_whatsapp_audio(audio_url: str, request_id: str, sender_phone: str) -> dict:
-        """Processa áudio do WhatsApp usando nosso bucket existente"""
-        try:
-            # 1. Baixa o áudio do Supabase
-            temp_path = AudioService.get_temp_path(f"process_{request_id}.ogg")
-            try:
-                # Download do áudio
-                audio_data = supabase.storage.from_(SUPABASE_AUDIO_BUCKET).download(audio_url)
-                with open(temp_path, "wb") as f:
-                    f.write(audio_data)
-                
-                # 2. Transcrição
-                transcription = await AudioService.speech_to_text(
-                    audio_path=temp_path,
-                    request_id=request_id
-                )
-                
-                if not transcription.get("text"):
-                    raise ValueError("Falha ao transcrever áudio")
-                
-                return {
-                    "success": True,
-                    "transcription": transcription["text"],
-                    "audio_path": temp_path
-                }
-                
-            finally:
-                # Limpa arquivo temporário
-                if os.path.exists(temp_path):
-                    try:
-                        os.remove(temp_path)
-                        logger.info(f"Arquivo temporário removido: {temp_path}")
-                    except Exception as e:
-                        logger.warning(f"Erro ao remover arquivo temporário: {str(e)}")
-                        
-        except Exception as e:
-            logger.error(f"Erro ao processar áudio do WhatsApp: {str(e)}")
-            raise
-    
-    @staticmethod
-    async def text_to_speech(text: str, request_id: str, voice: str = "nova") -> dict:
+    async def text_to_speech(text: str, request_id: str) -> dict:
         """Converte texto para áudio usando a API OpenAI TTS."""
         temp_path = None
         try:
@@ -140,7 +52,7 @@ class AudioService:
             
             response = client.audio.speech.create(
                 model="tts-1",
-                voice=voice,  # Usa a voz específica da persona
+                voice="alloy",
                 input=text
             )
             
@@ -163,7 +75,6 @@ class AudioService:
             logger.info(f"Áudio disponível em: {public_url}")
             
             return {
-                "success": True,
                 "local_path": temp_path,
                 "public_url": public_url
             }
@@ -184,18 +95,15 @@ class AudioService:
     async def speech_to_text(audio_path: str, request_id: str) -> dict:
         """Transcreve áudio para texto usando a API OpenAI Whisper."""
         try:
-            # Verifica acesso ao bucket
+            # Garante que o bucket existe
             await AudioService.ensure_bucket_exists()
             
-            client = OpenAI(api_key=GPT_API_KEY)
-            if not GPT_API_KEY:
-                raise ValueError("GPT_API_KEY não configurada")
+            client = OpenAI(api_key=os.getenv("GPT_API_KEY"))
             
             # Upload para o Supabase
             with open(audio_path, "rb") as f:
-                file_path = f"stt/{request_id}.mp3"
                 supabase.storage.from_(SUPABASE_AUDIO_BUCKET).upload(
-                    path=file_path,
+                    path=f"stt/{request_id}.mp3",
                     file=f,
                     file_options={"content-type": "audio/mpeg"}
                 )
@@ -205,14 +113,12 @@ class AudioService:
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1", 
                     file=audio_file,
-                    response_format="text",
-                    language="pt"  # Especifica português
+                    response_format="text"
                 )
             
             logger.info(f"Áudio transcrito com sucesso: {transcription[:100]}...")
             
             return {
-                "success": True,
                 "text": transcription,
                 "audio_path": audio_path
             }

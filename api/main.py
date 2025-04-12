@@ -15,7 +15,6 @@ from datetime import datetime
 from api.routers import chat, health, whatsapp
 from api.utils.logger import logger
 from api.utils.cache_manager import cache_manager
-from api.utils.database import SupabaseManager
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -31,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Cria a aplicação FastAPI
 app = FastAPI(
     title="MPC API",
-    description="API para processamento de mensagens e áudios com LLMs",
+    description="API para roteamento inteligente de LLMs",
     version="1.0.0"
 )
 
@@ -44,16 +43,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicializa o gerenciador de banco de dados
-db_manager = SupabaseManager()
-
 # Inclui os routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
-app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["whatsapp"])
+
+# Router do WhatsApp sem prefixo para compatibilidade com MegaAPI
+app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
 
 @app.on_event("startup")
-async def startup():
+async def startup_event():
     """Evento de inicialização da API"""
     try:
         # Inicializa tabela de cache
@@ -64,7 +62,7 @@ async def startup():
         raise
 
 @app.on_event("shutdown")
-async def shutdown():
+async def shutdown_event():
     """Evento de encerramento da API"""
     try:
         logger.info("API encerrada com sucesso")
@@ -75,7 +73,7 @@ async def shutdown():
 async def root():
     """Rota raiz"""
     return {
-        "message": "MPC API - Processamento de Mensagens e Áudios com LLMs",
+        "message": "MPC API - Roteamento Inteligente de LLMs",
         "version": "1.0.0"
     }
 
