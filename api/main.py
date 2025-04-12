@@ -15,7 +15,7 @@ from datetime import datetime
 from api.routers import chat, health, whatsapp
 from api.utils.logger import logger
 from api.utils.cache_manager import cache_manager
-from api.utils import do_db
+from api.utils.database import SupabaseManager
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -44,6 +44,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Inicializa o gerenciador de banco de dados
+db_manager = SupabaseManager()
+
 # Inclui os routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
@@ -55,7 +58,6 @@ async def startup():
     try:
         # Inicializa tabela de cache
         cache_manager._ensure_cache_table()
-        await do_db.initialize()
         logger.info("API iniciada com sucesso")
     except Exception as e:
         logger.error(f"Erro ao inicializar API: {str(e)}")
@@ -65,7 +67,6 @@ async def startup():
 async def shutdown():
     """Evento de encerramento da API"""
     try:
-        await do_db.close()
         logger.info("API encerrada com sucesso")
     except Exception as e:
         logger.error(f"Erro ao encerrar API: {str(e)}")

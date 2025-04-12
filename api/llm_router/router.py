@@ -199,267 +199,84 @@ class LLMRouter:
         **kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Roteia o prompt para o modelo mais apropriado.
-        
-        Args:
-            prompt: O texto do prompt
-            sender_phone: Número do remetente para contexto
-            model: Modelo específico a ser usado (opcional)
-            use_cache: Se deve usar o cache
-            generate_audio: Se deve gerar áudio da resposta
-            **kwargs: Argumentos adicionais para a chamada do modelo
-            
-        Returns:
-            Dict com a resposta e metadados
+        Roteia um prompt para o modelo mais apropriado
         """
         try:
-            logger.info(f"Iniciando roteamento para sender_phone: {sender_phone}")
-            logger.info(f"Prompt recebido: {prompt}")
-            
-            # Se for solicitado geração de áudio, usa prioritariamente o GPT
+            # Se for para gerar áudio, usa o GPT diretamente
             if generate_audio and "gpt" in self.models:
-                logger.info("Geração de áudio solicitada, usando GPT prioritariamente")
                 model = "gpt"
+                logger.info("Usando GPT para geração de áudio")
             
-            # Verifica cache primeiro
+            # Se não tiver modelo específico, classifica o prompt
+            if not model:
+                classification = await classify_prompt(prompt)
+                model = classification["best_model"]
+                logger.info(f"Modelo escolhido por classificação: {model}")
+            
+            # Verifica cache se habilitado
             if use_cache:
-                cached_response = await cache_manager.get_cached_response(prompt)
-                if cached_response:
+                cached = await cache_manager.get_cached_response(prompt)
+                if cached:
                     logger.info("Resposta encontrada no cache")
-                    # Adiciona à memória de conversa se tiver sender_phone
                     if sender_phone:
-                        await conversation_manager.add_message(
-                            sender_phone=sender_phone,
-                            role="user",
-                            content=prompt,
-                            save_to_db=True
+                        # Atualiza contexto mesmo com resposta do cache
+                        await conversation_manager.update_conversation_context(
+                            sender_phone, prompt, cached["response"]
                         )
-                        await conversation_manager.add_message(
-                            sender_phone=sender_phone,
-                            role="assistant",
-                            content=cached_response["text"],
-                            model_used=cached_response["model"],
-                            save_to_db=True
-                        )
-                    
-                    # Se precisar gerar áudio, gera a partir do texto do cache
-                    audio_info = None
-                    if generate_audio:
-                        logger.info("Gerando áudio para resposta do cache")
-                        audio_info = await audio_service.text_to_speech(
-                            cached_response["text"],
-                            sender_phone=sender_phone
-                        )
-                        
-                        # Salva metadados do áudio vinculados ao sender_phone
-                        if audio_info["success"] and sender_phone:
-                            conversation_id = await conversation_manager.get_conversation_id(sender_phone)
-                            await audio_service.save_audio_metadata(audio_info, conversation_id)
-                    
-                    result = {
-                        "text": cached_response["text"],
-                        "model": cached_response["model"],
-                        "success": True,
-                        "from_cache": True,
-                        "cache_info": {
-                            "hit_count": cached_response.get("hit_count", 1),
-                            "cached_at": cached_response.get("created_at", datetime.utcnow().isoformat()),
-                            "last_accessed": cached_response.get("last_accessed", datetime.utcnow().isoformat())
-                        },
-                        "has_memory": bool(sender_phone)
-                    }
-                    
-                    # Adiciona informações de áudio ao resultado se gerado
-                    if generate_audio and audio_info and audio_info["success"]:
-                        audio_base64 = await audio_service.get_audio_base64(audio_info["local_path"])
-                        if audio_base64:
-                            result["audio"] = {
-                                "data": audio_base64,
-                                "format": "mp3",
-                                "base64": True,
-                                "url": audio_info["url"]
-                            }
-                        # Limpa arquivo temporário
-                        audio_service.cleanup_temp_file(audio_info["local_path"])
-                        
-                    return result
+                    return cached
 
-            # Adiciona mensagem do usuário à memória
+            # Obtém contexto da conversa se tiver sender_phone
+            context = []
             if sender_phone:
-                logger.info("Adicionando mensagem do usuário à memória")
-                await conversation_manager.add_message(
-                    sender_phone=sender_phone,
-                    role="user",
-                    content=prompt,
-                    save_to_db=True
-                )
-                
-                # Recupera contexto da conversa
-                context = await conversation_manager.format_conversation_for_llm(sender_phone)
-                full_prompt = f"{context}\n\nNova mensagem: {prompt}"
-                logger.info(f"Prompt com contexto: {full_prompt}")
-            else:
-                logger.info("Sem sender_phone, usando prompt sem contexto")
-                full_prompt = prompt
+                context = await conversation_manager.get_conversation_context(sender_phone)
+                if context:
+                    # Adiciona contexto ao prompt
+                    formatted_context = "\n".join([
+                        f"{'Usuário' if msg['role'] == 'user' else 'Assistente'}: {msg['content']}"
+                        for msg in context[-5:]  # Usa últimas 5 mensagens
+                    ])
+                    prompt = f"Contexto anterior:\n{formatted_context}\n\nNova mensagem: {prompt}"
 
-            # Se um modelo específico foi solicitado
-            if model:
-                # Verifica se o modelo solicitado existe em alguma forma
-                model_exists = model in self.models or model in self.fallback_order
+            # Adiciona prompt de personalidade se tiver persona definida
+            personality_prompt = PersonaConfig.get_persona_prompt(self.current_persona)
+            if personality_prompt:
+                prompt = f"{personality_prompt}\n\n{prompt}"
+
+            # Chama o modelo com fallback
+            response = await self._try_model_with_fallback(model, prompt, **kwargs)
+            
+            # Se geração de áudio foi solicitada
+            if generate_audio and response.get("success", True):
+                try:
+                    voice = kwargs.get("voice", PersonaConfig.get_voice(self.current_persona))
+                    audio_result = await audio_service.text_to_speech(
+                        text=response["text"],
+                        voice=voice
+                    )
+                    if audio_result.get("success"):
+                        response["audio_url"] = audio_result.get("public_url")
+                        response["audio_path"] = audio_result.get("file_path")
+                except Exception as e:
+                    logger.error(f"Erro ao gerar áudio: {str(e)}")
+                    response["audio_error"] = str(e)
+
+            # Atualiza cache e contexto
+            if response.get("success", True) and use_cache:
+                await cache_manager.cache_response(prompt, response)
                 
-                if not model_exists:
-                    logger.warning(f"Modelo solicitado '{model}' não existe, usando classificação automática")
-                    model = None
-                else:
-                    # Chama o modelo com fallback automático
-                    response = await self._try_model_with_fallback(model, full_prompt, **kwargs)
-                    chosen_model = response["model"]
-                    response_text = response["text"]
-                    used_fallback = response.get("used_fallback", False)
-                    
-                    logger.info(f"Modelo usado: {chosen_model} (solicitado: {model}, fallback: {used_fallback})")
-                    
-                    # Gera áudio se solicitado
-                    audio_info = None
-                    if generate_audio:
-                        logger.info(f"Gerando áudio para resposta do modelo {chosen_model}")
-                        audio_info = await audio_service.text_to_speech(
-                            response_text,
-                            sender_phone=sender_phone
-                        )
-                        
-                        # Salva metadados do áudio vinculados ao sender_phone
-                        if audio_info["success"] and sender_phone:
-                            conversation_id = await conversation_manager.get_conversation_id(sender_phone)
-                            await audio_service.save_audio_metadata(audio_info, conversation_id)
-                    
-                    result = {
-                        "text": response_text,
-                        "model": chosen_model,
-                        "requested_model": model,  # Modelo originalmente solicitado
-                        "used_fallback": used_fallback,
-                        "fallback_info": response.get("fallback_info", []),
-                        "success": True,
-                        "from_cache": False,
-                        "has_memory": bool(sender_phone)
-                    }
-                    
-                    # Adiciona informações de áudio ao resultado se gerado
-                    if generate_audio and audio_info and audio_info["success"]:
-                        audio_base64 = await audio_service.get_audio_base64(audio_info["local_path"])
-                        if audio_base64:
-                            result["audio"] = {
-                                "data": audio_base64,
-                                "format": "mp3",
-                                "base64": True,
-                                "url": audio_info["url"]
-                            }
-                        # Limpa arquivo temporário
-                        audio_service.cleanup_temp_file(audio_info["local_path"])
-                    
-                    # Salva no cache
-                    if use_cache:
-                        await cache_manager.cache_response(prompt, result, chosen_model)
-                    
-                    # Adiciona resposta do assistente à memória
-                    if sender_phone:
-                        logger.info("Salvando resposta do assistente na memória")
-                        await conversation_manager.add_message(
-                            sender_phone=sender_phone,
-                            role="assistant",
-                            content=response_text,
-                            model_used=chosen_model,
-                            save_to_db=True
-                        )
-                    
-                    return result
-                
-            # Caso contrário, use o classificador para escolher o modelo
-            classification = classify_prompt(prompt)
-            chosen_model = classification["model"]
-            confidence = classification["confidence"]
-            model_scores = classification["model_scores"]
-            indicators = classification["indicators"]
-            
-            logger.info(f"Modelo escolhido pelo classificador: {chosen_model} (confiança: {confidence:.2f})")
-            logger.info(f"Scores dos modelos: {json.dumps(model_scores, indent=2)}")
-            logger.info(f"Indicadores: {json.dumps(indicators, indent=2)}")
-            
-            # Chama o modelo escolhido com fallback automático
-            response = await self._try_model_with_fallback(chosen_model, full_prompt, **kwargs)
-            used_model = response["model"]
-            response_text = response["text"]
-            used_fallback = response.get("used_fallback", False)
-            
-            logger.info(f"Modelo efetivamente usado: {used_model} (classificado: {chosen_model}, fallback: {used_fallback})")
-            
-            # Gera áudio se solicitado
-            audio_info = None
-            if generate_audio:
-                logger.info(f"Gerando áudio para resposta do modelo {used_model}")
-                audio_info = await audio_service.text_to_speech(
-                    response_text,
-                    sender_phone=sender_phone
+            if sender_phone and response.get("success", True):
+                await conversation_manager.update_conversation_context(
+                    sender_phone, prompt, response["text"]
                 )
-                
-                # Salva metadados do áudio vinculados ao sender_phone
-                if audio_info["success"] and sender_phone:
-                    conversation_id = await conversation_manager.get_conversation_id(sender_phone)
-                    await audio_service.save_audio_metadata(audio_info, conversation_id)
-            
-            result = {
-                "text": response_text,
-                "model": used_model,
-                "classified_model": chosen_model,
-                "confidence": confidence,
-                "model_scores": model_scores,
-                "indicators": indicators,
-                "used_fallback": used_fallback,
-                "fallback_info": response.get("fallback_info", []),
-                "success": True,
-                "from_cache": False,
-                "has_memory": bool(sender_phone)
-            }
-            
-            # Adiciona informações de áudio ao resultado se gerado
-            if generate_audio and audio_info and audio_info["success"]:
-                audio_base64 = await audio_service.get_audio_base64(audio_info["local_path"])
-                if audio_base64:
-                    result["audio"] = {
-                        "data": audio_base64,
-                        "format": "mp3",
-                        "base64": True,
-                        "url": audio_info["url"]
-                    }
-                # Limpa arquivo temporário
-                audio_service.cleanup_temp_file(audio_info["local_path"])
-            
-            # Salva no cache
-            if use_cache:
-                await cache_manager.cache_response(prompt, result, used_model)
-            
-            # Adiciona resposta do assistente à memória
-            if sender_phone:
-                logger.info("Salvando resposta do assistente na memória")
-                await conversation_manager.add_message(
-                    sender_phone=sender_phone,
-                    role="assistant",
-                    content=response_text,
-                    model_used=used_model,
-                    save_to_db=True
-                )
-            
-            return result
-            
+
+            return response
+
         except Exception as e:
-            logger.error(f"Erro ao rotear prompt: {str(e)}")
-            logger.exception("Stacktrace completo:")
+            logger.error(f"Erro no roteamento: {str(e)}")
             return {
-                "text": f"Erro ao processar prompt: {str(e)}",
-                "model": model or "unknown",
+                "text": "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.",
                 "success": False,
-                "from_cache": False,
-                "has_memory": bool(sender_phone)
+                "error": str(e)
             }
 
     async def _generate_response(self, prompt: str, model: Optional[str] = None) -> Dict[str, Any]:
