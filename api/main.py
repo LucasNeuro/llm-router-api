@@ -15,6 +15,7 @@ from datetime import datetime
 from api.routers import chat, health, whatsapp
 from api.utils.logger import logger
 from api.utils.cache_manager import cache_manager
+from api.utils import do_db
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 # Cria a aplicação FastAPI
 app = FastAPI(
     title="MPC API",
-    description="API para roteamento inteligente de LLMs",
+    description="API para processamento de mensagens e áudios com LLMs",
     version="1.0.0"
 )
 
@@ -46,25 +47,25 @@ app.add_middleware(
 # Inclui os routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
-
-# Router do WhatsApp sem prefixo para compatibilidade com MegaAPI
-app.include_router(whatsapp.router, prefix="/api", tags=["whatsapp"])
+app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["whatsapp"])
 
 @app.on_event("startup")
-async def startup_event():
+async def startup():
     """Evento de inicialização da API"""
     try:
         # Inicializa tabela de cache
         cache_manager._ensure_cache_table()
+        await do_db.initialize()
         logger.info("API iniciada com sucesso")
     except Exception as e:
         logger.error(f"Erro ao inicializar API: {str(e)}")
         raise
 
 @app.on_event("shutdown")
-async def shutdown_event():
+async def shutdown():
     """Evento de encerramento da API"""
     try:
+        await do_db.close()
         logger.info("API encerrada com sucesso")
     except Exception as e:
         logger.error(f"Erro ao encerrar API: {str(e)}")
@@ -73,7 +74,7 @@ async def shutdown_event():
 async def root():
     """Rota raiz"""
     return {
-        "message": "MPC API - Roteamento Inteligente de LLMs",
+        "message": "MPC API - Processamento de Mensagens e Áudios com LLMs",
         "version": "1.0.0"
     }
 

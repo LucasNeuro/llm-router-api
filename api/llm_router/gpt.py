@@ -1,74 +1,88 @@
 import os
-from openai import OpenAI
-from loguru import logger
-from typing import Optional, Dict, Any
-from dotenv import load_dotenv
+from typing import Dict, Any, Optional
+import httpx
+import json
+from api.utils.logger import logger
 
-# Carrega variáveis de ambiente
-load_dotenv()
+# Configurações do GPT
+GPT_API_KEY = os.getenv("GPT_API_KEY")
+if not GPT_API_KEY:
+    logger.warning("GPT_API_KEY não encontrada nas variáveis de ambiente")
 
-# Inicializa o cliente OpenAI apenas com a API key
-# Remova qualquer outro parâmetro não suportado pela versão atual da biblioteca
-client = OpenAI(
-    api_key=os.getenv("GPT_API_KEY")
-)
+# Modelo padrão do GPT
+GPT_MODEL = "gpt-4"  # Modelo mais avançado
+GPT_URL = "https://api.openai.com/v1/chat/completions"
 
-async def generate_response(
-    prompt: str,
-    model: str = "gpt-4-turbo-preview",
-    temperature: float = 0.7,
-    max_tokens: Optional[int] = None,
-    stream: bool = False,
-    **kwargs: Dict[str, Any]
-) -> str:
+async def call_gpt(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
     """
-    Gera uma resposta usando o modelo GPT especificado.
-    
-    Args:
-        prompt: O texto do prompt
-        model: O modelo a ser usado (default: gpt-4-turbo-preview)
-        temperature: Temperatura para controle de criatividade (0.0 a 1.0)
-        max_tokens: Número máximo de tokens na resposta
-        stream: Se True, retorna a resposta em streaming
-        **kwargs: Argumentos adicionais para a API
-        
-    Returns:
-        str: A resposta gerada pelo modelo
+    Chama o modelo GPT da OpenAI
     """
     try:
-        if not client:
-            raise ValueError("Cliente OpenAI não inicializado")
+        if not GPT_API_KEY:
+            raise ValueError("GPT_API_KEY não configurada")
             
-        # Log da chamada
-        logger.info(f"Chamando GPT com modelo {model}")
-        
-        # Prepara os parâmetros
-        params = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {GPT_API_KEY}"
         }
         
-        # Adiciona max_tokens se especificado
-        if max_tokens:
-            params["max_tokens"] = max_tokens
-            
-        # Filtra kwargs para incluir apenas parâmetros suportados
-        # Isso evita passar parâmetros como 'proxies' que podem não ser suportados
-        supported_params = ["frequency_penalty", "presence_penalty", "stop", "timeout"]
-        for key in kwargs:
-            if key in supported_params:
-                params[key] = kwargs[key]
-            
-        # Faz a chamada à API
-        response = await client.chat.completions.create(**params)
+        # Prepara os mensagens
+        messages = []
         
-        # Processa a resposta
-        if stream:
-            return response
-        else:
-            return response.choices[0].message.content
+        # Adiciona system prompt se existir
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+            
+        # Adiciona mensagem do usuário
+        messages.append({"role": "user", "content": prompt})
+        
+        # Prepara o corpo da requisição
+        data = {
+            "model": GPT_MODEL,
+            "messages": messages,
+            "max_tokens": 1000,
+            "temperature": 0.7
+        }
+            
+        # Realiza a chamada para a API
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                GPT_URL,
+                headers=headers,
+                json=data
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Erro na API do GPT: {response.status_code}")
+                logger.error(f"Resposta: {response.text}")
+                raise ValueError(f"Erro na API do GPT: {response.status_code} - {response.text}")
+                
+            response_data = response.json()
+            
+            # Extrai o texto da resposta
+            choices = response_data.get("choices", [])
+            if not choices:
+                raise ValueError("Resposta vazia do GPT")
+                
+            text = choices[0].get("message", {}).get("content", "")
+            
+            if not text:
+                raise ValueError("Texto vazio na resposta do GPT")
+                
+            return {
+                "text": text,
+                "model": "gpt",
+                "success": True,
+                "confidence": 1.0,
+                "usage": response_data.get("usage", {})
+            }
             
     except Exception as e:
-        logger.error(f"Erro ao gerar resposta com GPT: {str(e)}")
-        raise
+        error_msg = f"Erro ao chamar GPT: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "text": error_msg,
+            "model": "gpt",
+            "success": False,
+            "confidence": 0.0
+        }

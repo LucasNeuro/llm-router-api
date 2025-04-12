@@ -1,16 +1,23 @@
 services:
-  # Web service
   - type: web
-    name: llm-router-api
-    runtime: python
+    name: mpc-api
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: cd api && python run.py
-    plan: free
-    autoDeploy: true
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PORT
-        value: 10000
-      - key: API_HOST
-        value: 0.0.0.0
-      - key: PYTHON_VERSION
-        value: 3.10.0
+      - key: MEGAAPI_INSTANCE_ID
+        sync: false
+      - key: MEGAAPI_TOKEN
+        sync: false
+      - key: MEGAAPI_HOST
+        value: apibusiness1.megaapi.com.br
+      - key: GPT_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: MAKE_WEBHOOK_URL
+        sync: false
+    healthCheckPath: /api/v1/health
+    autoDeploy: true

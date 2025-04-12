@@ -1,12 +1,18 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, File, UploadFile, Form
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, Union
-from api.utils.logger import logger
+from loguru import logger
 from ..llm_router.router import LLMRouter
 from ..llm_router.cost_analyzer import analyze_cost
 from ..utils.supabase import supabase, save_llm_data
 from ..utils.conversation_memory import conversation_manager
 import uuid
+import json
+import base64
+from ..utils.audio_service import AudioService
+import os
+import tempfile
+import aiofiles
 
 router = APIRouter()
 llm_router = LLMRouter()
@@ -15,7 +21,7 @@ class ChatRequest(BaseModel):
     prompt: str
     sender_phone: Optional[str] = None
     model: Optional[str] = None
-    clear_memory: Optional[bool] = False
+    generate_audio: Optional[bool] = False
 
 class CostDetail(BaseModel):
     cents: int
@@ -44,80 +50,116 @@ class ChatResponse(BaseModel):
     has_memory: Optional[bool] = True
 
 async def cleanup_old_memories(background_tasks: BackgroundTasks):
-    """Tarefa em background para limpar memórias antigas (mais de 30 dias)"""
-    await conversation_manager.cleanup_old_memories(days=30)
+    """Limpa memórias antigas em background"""
+    try:
+        await conversation_manager.cleanup_inactive_sessions(max_age_hours=24)
+    except Exception as e:
+        logger.error(f"Erro ao limpar memórias antigas: {str(e)}")
 
 @router.post("/chat")
-async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks):
+async def chat_endpoint(request: ChatRequest):
+    """Endpoint principal de chat que processa texto e opcionalmente gera áudio."""
     try:
-        # Adiciona tarefa de limpeza em background
-        background_tasks.add_task(cleanup_old_memories, background_tasks)
-        
         # Gera um ID único para a requisição
         request_id = str(uuid.uuid4())
-        
-        # Log da requisição recebida
-        logger.info(f"Requisição recebida - ID: {request_id}")
-        logger.info(f"Prompt: {request.prompt}")
-        logger.info(f"Modelo especificado: {request.model}")
-        
-        # Processa a requisição
-        result = await llm_router.route_prompt(
+        logger.info(f"Nova requisição de chat: {request_id}")
+
+        # Roteamento do prompt
+        router = LLMRouter()
+        response = await router.route_prompt(
             prompt=request.prompt,
             sender_phone=request.sender_phone,
             model=request.model
         )
-        
-        # Analisa custos
-        cost_analysis = analyze_cost(result["model"], request.prompt, result["text"])
-        
-        # Prepara resposta
-        response_data = {
-            "text": result["text"],
-            "model": result["model"],
-            "success": result["success"],
-            "confidence": result.get("confidence"),
-            "model_scores": result.get("model_scores"),
-            "indicators": result.get("indicators"),
-            "cost_analysis": cost_analysis,
-            "has_memory": bool(request.sender_phone)
-        }
-        
-        # Cria objeto ChatResponse
-        response = ChatResponse(**response_data)
-        
-        # Salva dados no Supabase
-        await save_llm_data(
-            prompt=request.prompt,
-            response=response.text,
-            model=response.model,
-            success=response.success,
-            confidence=response.confidence,
-            scores=response.model_scores or {},
-            indicators=response.indicators or {},
-            cost_analysis=cost_analysis,
-            request_id=request_id
-        )
-        
+
+        # Se solicitado, gera áudio da resposta
+        if request.generate_audio and response.get("text"):
+            try:
+                audio_result = await AudioService.text_to_speech(
+                    text=response["text"],
+                    request_id=request_id
+                )
+                response["audio"] = audio_result
+            except Exception as e:
+                logger.error(f"Erro ao gerar áudio: {str(e)}")
+                response["audio_error"] = str(e)
+
         return response
-        
+
     except Exception as e:
-        logger.error(f"Erro no processamento: {str(e)}")
+        logger.error(f"Erro no endpoint de chat: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/clear-memory/{sender_phone}")
-async def clear_memory(sender_phone: str):
-    """Endpoint para limpar a memória de um número específico"""
+@router.post("/chat/audio")
+async def audio_chat_endpoint(
+    audio: UploadFile = File(...),
+    sender_phone: Optional[str] = Form(None),
+    model: Optional[str] = None,
+    generate_audio: Optional[bool] = Form(False)
+):
+    """Endpoint que recebe áudio, transcreve e processa como chat."""
     try:
-        # Cria um novo registro vazio para o número
-        data = {
-            "conversation_memory": {"messages": []}
-        }
-        supabase.table("conversation_memory")\
-            .update(data)\
-            .eq("sender_phone", sender_phone)\
-            .execute()
-        return {"message": "Memória limpa com sucesso"}
+        # Gera um ID único para a requisição
+        request_id = str(uuid.uuid4())
+        logger.info(f"Nova requisição de áudio: {request_id}")
+
+        # Salva o arquivo de áudio temporariamente
+        temp_path = AudioService.get_temp_path(f"upload_{request_id}.mp3")
+        try:
+            with open(temp_path, "wb") as f:
+                content = await audio.read()
+                f.write(content)
+            logger.info(f"Áudio salvo temporariamente em: {temp_path}")
+
+            # Transcreve o áudio
+            transcription = await AudioService.speech_to_text(temp_path, request_id)
+            if not transcription.get("text"):
+                raise HTTPException(status_code=400, detail="Falha ao transcrever áudio")
+
+            # Processa o texto transcrito
+            router = LLMRouter()
+            response = await router.route_prompt(
+                prompt=transcription["text"],
+                sender_phone=sender_phone,
+                model=model
+            )
+
+            # Adiciona informação da transcrição à resposta
+            response["transcription"] = transcription["text"]
+
+            # Se solicitado, gera áudio da resposta
+            if generate_audio and response.get("text"):
+                try:
+                    audio_result = await AudioService.text_to_speech(
+                        text=response["text"],
+                        request_id=f"{request_id}_response"
+                    )
+                    response["audio"] = audio_result
+                except Exception as e:
+                    logger.error(f"Erro ao gerar áudio da resposta: {str(e)}")
+                    response["audio_error"] = str(e)
+
+            return response
+
+        finally:
+            # Limpa o arquivo temporário
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                    logger.info(f"Arquivo temporário removido: {temp_path}")
+                except Exception as e:
+                    logger.warning(f"Erro ao remover arquivo temporário: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Erro no endpoint de áudio: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/chat/clear-memory")
+async def clear_memory_endpoint(sender_phone: str):
+    """Limpa o histórico de conversa para um número específico."""
+    try:
+        supabase.table("conversation_history").delete().eq("sender_phone", sender_phone).execute()
+        return {"message": f"Memória limpa para {sender_phone}"}
     except Exception as e:
         logger.error(f"Erro ao limpar memória: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
