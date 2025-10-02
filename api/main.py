@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 import logging
 from datetime import datetime
 from api.routers import chat, health, whatsapp
+from api.routers import rag as rag_router
+from api.routers import slack as slack_router
 from api.utils.logger import logger
 from api.utils.cache_manager import cache_manager
 
@@ -49,6 +51,8 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 
 # Router do WhatsApp sem prefixo para compatibilidade com MegaAPI
 app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
+app.include_router(rag_router.router, prefix="/api/v1", tags=["rag"])
+app.include_router(slack_router.router, prefix="/api/v1", tags=["slack"])
 
 @app.on_event("startup")
 async def startup_event():
