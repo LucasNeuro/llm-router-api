@@ -10,6 +10,7 @@ import uuid
 import json
 import base64
 from ..utils.audio_service import AudioService
+from ..utils.rag import search_similar, format_chunks_as_context
 import os
 import tempfile
 import aiofiles
@@ -22,6 +23,9 @@ class ChatRequest(BaseModel):
     sender_phone: Optional[str] = None
     model: Optional[str] = None
     generate_audio: Optional[bool] = False
+    use_rag: Optional[bool] = False
+    rag_namespace: Optional[str] = None
+    rag_top_k: Optional[int] = 5
 
 class CostDetail(BaseModel):
     cents: int
@@ -64,12 +68,27 @@ async def chat_endpoint(request: ChatRequest):
         request_id = str(uuid.uuid4())
         logger.info(f"Nova requisição de chat: {request_id}")
 
+        # Monta contexto RAG opcional
+        system_prompt = None
+        if request.use_rag:
+            try:
+                chunks = await search_similar(
+                    request.prompt,
+                    top_k=request.rag_top_k or 5,
+                    namespace=request.rag_namespace,
+                )
+                if chunks:
+                    system_prompt = format_chunks_as_context(chunks)
+            except Exception as e:
+                logger.error(f"Erro ao buscar contexto RAG: {str(e)}")
+
         # Roteamento do prompt
         router = LLMRouter()
         response = await router.route_prompt(
             prompt=request.prompt,
             sender_phone=request.sender_phone,
-            model=request.model
+            model=request.model,
+            system_prompt=system_prompt
         )
 
         # Se solicitado, gera áudio da resposta
